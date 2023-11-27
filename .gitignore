@@ -1,0 +1,14 @@
+path/*
+runs/*
+weights/*
+models/__pycache__/*
+models/*.pyc
+train_eval/__pycache__/*
+train_eval/*.pyc
+util/__pycache__/*
+util/*.pyc
+datasets/__pycache__/*
+datasets/*.pyc
+job.slurm
+output.log
+*.txt
