@@ -175,7 +175,7 @@ class ResBlock_2d_with_Attention(nn.Module):
 
 
 class Conv1d_AutoEncoder(nn.Module):
-    def __init__(self, in_dim: int = 1024, in_channel: int = 2, 
+    def __init__(self, in_dim: int = 1024, in_channel: int = 12, 
                  drop_path: float = 0.4, with_atten: bool = True) -> None:
         super(Conv1d_AutoEncoder, self).__init__()
         self.in_channel = in_channel
@@ -236,8 +236,8 @@ class Conv1d_AutoEncoder(nn.Module):
 
 
 class Conv2d_AutoEncoder(nn.Module):
-    def __init__(self, in_dim: Tuple[int, int] = (256, 1024), 
-                 in_channel: int = 2, drop_path: float = 0.4, with_atten: bool = True) -> None:
+    def __init__(self, in_dim: Tuple[int, int] = (256, 1024), in_channel: int = 12, 
+                 drop_path: float = 0.4, with_atten: bool = True) -> None:
         super(Conv2d_AutoEncoder, self).__init__()
         self.in_channel = in_channel
         self.temp_dim = in_dim
@@ -290,3 +290,23 @@ class Conv2d_AutoEncoder(nn.Module):
         return x.squeeze(-1).squeeze(-1)
     
 
+class backbone(nn.Module):
+    def __init__(self, in_type: str = "1d", cfg: dict = None) -> None:
+        super().__init__()
+        self.AutoEncoder_cfg = {
+            "in_dim": (cfg["data_size"], cfg["data_size"]),
+            "in_channel": cfg["in_channels"],
+            "drop_path": cfg["drop_path"],
+            "with_atten": cfg["Encoder_attention"],
+        } if in_type == "2d" else {
+            "in_dim": cfg["data_size"],
+            "in_channel": cfg["in_channels"],
+            "drop_path": cfg["drop_path"],
+            "with_atten": cfg["Encoder_attention"],
+        }
+        
+        self.encoder = Conv2d_AutoEncoder(**self.AutoEncoder_cfg) \
+            if in_type == "2d" else \
+                Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
+                
+        self.embed_dim = self.encoder.channel
