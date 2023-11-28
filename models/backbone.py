@@ -205,12 +205,12 @@ class Conv1d_AutoEncoder(nn.Module):
                 self.channel *= 2
                 self.temp_dim //= 2
         
-        self.ResNet.append(nn.Conv1d(in_channels=self.channel, out_channels=1, kernel_size=1))
+        self.ResNet.append(nn.Conv1d(in_channels=self.channel, out_channels=self.channel, kernel_size=1))
         
         self.reduce_temp_dim = nn.Sequential(
             nn.Linear(self.temp_dim, 256),
             nn.Linear(256, 128),
-            nn.Linear(128, self.channel),
+            nn.Linear(128, 1),
         )
         self._reset_parameters()
     
@@ -220,18 +220,21 @@ class Conv1d_AutoEncoder(nn.Module):
                 nn.init.xavier_normal_(p)
     
     def forward(self, inputs: Tensor) -> Tensor:
-        # inputs: [L, 4, in_dim], 
-        # L is the sequence_length in the following Transformer based AutoRegressive model
-        # output: [L, Embedding], Embedding = 512
-
-        # assert inputs.shape[1] == 2 and len(inputs.shape) == 3, "Input shape should be [B, 2, Embedding]"
+        '''
+        inputs: [L, channel, in_dim],
+                L is the number of frames in each input data matrix, default is 512
+                channel is the number of channels in each input data matrix, 
+                    default is 12, which means 4 receivers antenna's T-F data (Amp, Real, Imag)
+                in_dim is the number of frequency bins in each input data matrix, default is 512
+        output: [L, Embedding], Embedding = 512
+        '''
 
         x = self.conv1(inputs)
         x = self.conv2(x)
         for block in self.ResNet:
             x = block(x)
-        x = x.squeeze(-2)
         x = self.reduce_temp_dim(x)
+        x = x.squeeze()
         return x
 
 
@@ -276,11 +279,14 @@ class Conv2d_AutoEncoder(nn.Module):
                 nn.init.xavier_normal_(p)
 
     def forward(self, inputs: Tensor) -> Tensor:
-        # inputs: [L, 2, in_dim], 
-        # L is the sequence_length in the following Transformer based AutoRegressive model
-        # output: [L, Embedding], Embedding = 512
-
-        # assert inputs.shape[1] == 2 and len(inputs.shape) == 3, "Input shape should be [B, 2, Embedding]"
+        '''
+        inputs: [L, channel, in_dim],
+                L is the number of frames in each input data matrix, default is 512
+                channel is the number of channels in each input data matrix, 
+                    default is 12, which means 4 receivers antenna's T-F data (Amp, Real, Imag)
+                in_dim is the number of frequency bins in each input data matrix, default is 512
+        output: [L, Embedding], Embedding = 512
+        '''
 
         x = self.conv1(inputs)
         x = self.conv2(x)
@@ -293,6 +299,8 @@ class Conv2d_AutoEncoder(nn.Module):
 class backbone(nn.Module):
     def __init__(self, in_type: str = "1d", cfg: dict = None) -> None:
         super().__init__()
+        self.in_type = in_type
+        
         self.AutoEncoder_cfg = {
             "in_dim": (cfg["data_size"], cfg["data_size"]),
             "in_channel": cfg["in_channels"],
@@ -310,3 +318,6 @@ class backbone(nn.Module):
                 Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
                 
         self.embed_dim = self.encoder.channel
+    
+    def forward(self, x: Tensor) -> Tensor:
+        pass
