@@ -270,8 +270,7 @@ class Conv2d_AutoEncoder(nn.Module):
                 self.channel *= 2
                 self.temp_dim = tuple(element // 2 for element in self.temp_dim)
 
-        self.avgpool = nn.AdaptiveAvgPool2d(1)
-        self._reset_parameters()
+        self.flat = nn.Flatten(start_dim=-2, end_dim=-1)
 
     def _reset_parameters(self):
         for p in self.parameters():
@@ -280,20 +279,21 @@ class Conv2d_AutoEncoder(nn.Module):
 
     def forward(self, inputs: Tensor) -> Tensor:
         '''
-        inputs: [L, channel, in_dim],
+        inputs: [B, channel, L, in_dim],
+                B is the batch size
                 L is the number of frames in each input data matrix, default is 512
                 channel is the number of channels in each input data matrix, 
                     default is 12, which means 4 receivers antenna's T-F data (Amp, Real, Imag)
                 in_dim is the number of frequency bins in each input data matrix, default is 512
-        output: [L, Embedding], Embedding = 512
+        output: [B, L * in_dim / 32^2, Embedding], Embedding = 512
         '''
 
         x = self.conv1(inputs)
         x = self.conv2(x)
         for block in self.ResNet:
             x = block(x)
-        x = self.avgpool(x)
-        return x.squeeze(-1).squeeze(-1)
+        x = self.flat(x)
+        return x.permute(0, 2, 1).contiguous()
     
 
 class backbone(nn.Module):
@@ -319,5 +319,20 @@ class backbone(nn.Module):
                 
         self.embed_dim = self.encoder.channel
     
-    def forward(self, x: Tensor) -> Tensor:
-        pass
+    def forward(self, inputs: Tensor) -> Tensor:
+        # inputs: [B, channel, L, in_dim],
+        #         B is the batch size
+        #         L is the number of frames in each input data matrix, default is 512
+        #         channel is the number of channels in each input data matrix,
+        #             default is 12, which means 4 receivers antenna's T-F data (Amp, Real, Imag)
+        #         in_dim is the number of frequency bins in each input data matrix, default is 512
+        
+        if self.in_type == "2d":
+            return self.encoder(inputs)
+        elif self.in_type == "1d":
+            b = inputs.shape[0]
+            device = inputs.device
+            output = torch.stack([self.encoder(inputs[i, ...].permute(1, 0, 2).contiguous()) 
+                                  for i in range(b)]).to(device)
+            return output
+        
