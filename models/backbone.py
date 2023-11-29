@@ -335,4 +335,7 @@ class backbone(nn.Module):
             output = torch.stack([self.encoder(inputs[i, ...].permute(1, 0, 2).contiguous()) 
                                   for i in range(b)]).to(device)
             return output
-        
+
+
+def build_backbone(cfg: dict = None) -> nn.Module:
+    return backbone(cfg["in_type"], cfg)        

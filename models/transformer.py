@@ -378,4 +378,18 @@ class Transformer_Decoder(nn.Module):
             output = self.norm(output)
 
         return output
+
+
+def build_transformer(cfg: dict):
+    decoder_params = {
+        "num_layers": cfg["num_decoder_layers"],
+        "d_model": cfg["d_model"],
+        "nhead": cfg["nhead"],
+        "dim_feedforward": cfg["dim_feedforward"],
+        "dropout": cfg["dropout"],
+        "drop_path": cfg["drop_path"],
+        "activation": cfg["activation"],
+        "normalize_before": cfg["normalize_before"],
+    }
+    return Transformer_Decoder(**decoder_params)
     
