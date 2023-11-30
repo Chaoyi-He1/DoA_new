@@ -87,10 +87,13 @@ class LoadDataAndLabels(Dataset):
             data = read_data_pickle(data_path, self.data_size)
         
         labels_out = {
-                "labels": torch.as_tensor(label[:, 0]).long(),
-                "boxes": torch.as_tensor(label[:, 1:5]),
-                "quadrant": torch.as_tensor(label[:, 5]),
-                "directions": torch.as_tensor(label[:, 6]),
+            "image_id": torch.as_tensor(index),
+            "orig_size": torch.as_tensor([self.data_size, self.data_size]),
+            "size": torch.as_tensor([self.data_size, self.data_size]),
+            "labels": torch.as_tensor(label[:, 0]).long(),
+            "boxes": torch.as_tensor(label[:, 1:5]),
+            "quadrant": torch.as_tensor(label[:, 5]),
+            "directions": torch.as_tensor(label[:, 6]),
         }
         
         return data, labels_out
