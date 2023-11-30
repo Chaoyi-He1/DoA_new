@@ -293,4 +293,5 @@ def build(hyp):
                              weight_dict=weight_dict,
                              eos_coef=hyp['eos_coef'],
                              losses=losses)
-    return detection, criterion
+    coco_postprocessors = {'bbox': PostProcess()}
+    return detection, criterion, coco_postprocessors

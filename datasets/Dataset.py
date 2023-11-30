@@ -94,6 +94,22 @@ class LoadDataAndLabels(Dataset):
         }
         
         return data, labels_out
+    
+    def coco_index(self, index):
+        """
+        This method is specially prepared for cocotools statistical label information,
+        without any processing on images and labels
+        """
+        o_shapes = np.array([self.data_size, self.data_size, 12], dtype=np.float64)  # wh to hw
+
+        # load labels
+        if self.cache:
+            x = self.label[index]
+        else:
+            with open(self.label_files[index], 'r') as f:
+                x = np.array([x.split() for x in f.read().splitlines()], dtype=np.float32)
+        labels = x[:, :5].copy()  # label: class, x, y, w, h, quadrant, angle
+        return torch.from_numpy(labels), o_shapes
 
     @staticmethod
     def collate_fn(batch):
