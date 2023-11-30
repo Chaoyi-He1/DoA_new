@@ -86,17 +86,19 @@ class LoadDataAndLabels(Dataset):
             
             data = read_data_pickle(data_path, self.data_size)
         
-        data = torch.from_numpy(data).unsqueeze(0)
-        label = torch.from_numpy(label)
+        labels_out = {
+                "labels": torch.as_tensor(label[:, 0]).long(),
+                "boxes": torch.as_tensor(label[:, 1:5]),
+                "quadrant": torch.as_tensor(label[:, 5]),
+                "directions": torch.as_tensor(label[:, 6]),
+        }
         
-        return data, label
+        return data, labels_out
 
     @staticmethod
     def collate_fn(batch):
         data, label = list(zip(*batch))
         data = np.stack(data, axis=0)
-        label = np.stack(label, axis=0)
         data = torch.from_numpy(data).float()
-        label = torch.from_numpy(label).float()
         return data, label
     

@@ -3,14 +3,46 @@ import torch.nn.functional as F
 from torch import nn
 
 from util import box_ops
-from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
-                       accuracy, get_world_size, interpolate,
-                       is_dist_avail_and_initialized)
+from util.misc import (get_world_size, is_dist_avail_and_initialized)
 
 from .backbone import build_backbone
 from .matcher import build_matcher
 from .transformer import build_transformer
+from .positional_embedding import build_position_encoding
 
+
+@torch.no_grad()
+def accuracy(output, target, topk=(1,)):
+    """Computes the precision@k for the specified values of k"""
+    if target.numel() == 0:
+        return [torch.zeros([], device=output.device)]
+    maxk = max(topk)
+    batch_size = target.size(0)
+
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+    correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+    res = []
+    for k in topk:
+        correct_k = correct[:k].view(-1).float().sum(0)
+        res.append(correct_k.mul_(100.0 / batch_size))
+    return res
+
+
+class MLP(nn.Module):
+    """ Very simple multi-layer perceptron (also called FFN)"""
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
+        super(MLP, self).__init__()
+        self.num_layers = num_layers
+        h = [hidden_dim] * (num_layers - 1)
+        self.layers = nn.ModuleList(nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim]))
+
+    def forward(self, x):
+        for i, layer in enumerate(self.layers):
+            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+        return x
+    
 
 class SetCriterion(nn.Module):
     """ This class computes the loss for DETR.
@@ -54,7 +86,7 @@ class SetCriterion(nn.Module):
             'labels': self.loss_labels,
             'cardinality': self.loss_cardinality,
             'boxes': self.loss_boxes,
-            'directions': self.loss_directions
+            'directions': self.loss_directions,
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
@@ -117,7 +149,7 @@ class SetCriterion(nn.Module):
 
     def loss_directions(self, outputs, targets, indices, num_directions):
         """Compute the losses related to the angle: the L1 regression loss.
-           targets dicts must contain the key "directions" containing a tensor of dim [nb_target_boxes, quadrant, angle]
+           targets dicts must contain the key "directions" containing a tensor of dim [nb_target_boxes, angle]
         """
         assert "pred_directions" in outputs
         idx = self._get_src_permutation_idx(indices)
@@ -127,6 +159,20 @@ class SetCriterion(nn.Module):
         loss_directions = F.l1_loss(src_directions, target_directions, reduction='none')
 
         losses = {'loss_directions': loss_directions.sum() / num_directions}
+        return losses
+    
+    def loss_quadrant(self, outputs, targets, indices, num_quadrants):
+        """Compute the losses related to the quadrant: the BCE loss.
+           targets dicts must contain the key "quadrant" containing a tensor of dim [nb_target_boxes, quadrant]
+        """
+        assert "pred_directions" in outputs
+        idx = self._get_src_permutation_idx(indices)
+        src_directions = outputs['pred_quadrant'][idx]
+        target_directions = torch.cat([t['quadrant'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+
+        loss_quadrant = F.binary_cross_entropy_with_logits(src_directions, target_directions, reduction='none')
+
+        losses = {'loss_quadrant': loss_quadrant.sum() / num_quadrants}
         return losses
 
     def forward(self, outputs, targets):
@@ -153,3 +199,65 @@ class SetCriterion(nn.Module):
         for loss in self.losses:
             losses.update(self.get_loss(loss, outputs, targets, indices, num_boxes))
         return losses
+
+
+class detection(nn.Module):
+    def __init__(self, backbone, transformer, num_classes, num_queries) -> None:
+        super().__init__()
+        self.num_queries = num_queries
+        self.backbone = backbone
+        self.transformer = transformer
+        hidden_dim = transformer.d_model
+        self.class_embed = MLP(hidden_dim, hidden_dim * 2, num_classes + 1, 3)
+        self.bbox_embed = MLP(hidden_dim, hidden_dim * 2, 4, 3)
+        self.quadrant_embed = MLP(hidden_dim, hidden_dim * 2, 1, 3)
+        self.direction_embed = MLP(hidden_dim, hidden_dim * 2, 1, 3)
+        self.query_embed = nn.Embedding(num_queries, hidden_dim)
+        self.pos_embed = build_position_encoding('sine', hidden_dim)
+    
+    def forward(self, inputs):
+        features = self.backbone(inputs)
+        pos = self.pos_embed(features)
+        hs = self.transformer(tgt=self.query_embed.weight, 
+                              memory=features, 
+                              pos=pos)
+        
+        outputs_class = self.class_embed(hs)
+        outputs_coord = self.bbox_embed(hs)
+        max_coord = outputs_coord.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
+        outputs_coord = (outputs_coord / max_coord).sigmoid()
+        outputs_quadrant = self.quadrant_embed(hs).sigmoid()
+        outputs_direction = self.direction_embed(hs)
+        max_direction = outputs_direction.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
+        outputs_direction = (outputs_direction / max_direction).sigmoid()
+        
+        out = {'pred_logits': outputs_class, 
+               'pred_boxes': outputs_coord, 
+               'pred_quadrant': outputs_quadrant, 
+               'pred_directions': outputs_direction}
+        return out
+
+
+def build(hyp):
+    backbone = build_backbone(hyp)
+    transformer = build_transformer(hyp)
+    detection = detection(backbone, 
+                          transformer, 
+                          hyp['num_classes'], 
+                          hyp['num_queries'])
+    matcher = build_matcher(hyp)
+    
+    weight_dict = {'loss_ce': hyp['ce_loss_coef'], 
+                   'loss_bbox': hyp['bbox_loss_coef'], 
+                   'loss_giou': hyp['giou_loss_coef'], 
+                   'loss_quadrant': hyp['quadrant_loss_coef'], 
+                   'loss_directions': hyp['direction_loss_coef'],
+                   }
+    losses = ['labels', 'boxes', 'quadrant', 'directions']
+    
+    criterion = SetCriterion(hyp['num_classes'],
+                             matcher=matcher,
+                             weight_dict=weight_dict,
+                             eos_coef=hyp['eos_coef'],
+                             losses=losses)
+    return detection, criterion

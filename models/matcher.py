@@ -16,7 +16,11 @@ class HungarianMatcher(nn.Module):
     while the others are un-matched (and thus treated as non-objects).
     """
 
-    def __init__(self, cost_class: float = 1, cost_bbox: float = 1, cost_giou: float = 1, cost_direction: float = 2):
+    def __init__(self, cost_class: float = 1, 
+                 cost_bbox: float = 1, 
+                 cost_giou: float = 1, 
+                 cost_quadrant: float = 1,
+                 cost_direction: float = 2):
         """Creates the matcher
 
         Params:
@@ -29,6 +33,7 @@ class HungarianMatcher(nn.Module):
         self.cost_class = cost_class
         self.cost_bbox = cost_bbox
         self.cost_giou = cost_giou
+        self.cost_quadrant = cost_quadrant
         self.cost_direction = cost_direction
         assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0 or cost_direction != 0, "all costs cant be 0"
 
@@ -60,11 +65,13 @@ class HungarianMatcher(nn.Module):
         # We flatten to compute the cost matrices in a batch
         out_prob = outputs["pred_logits"].flatten(0, 1).softmax(-1)  # [batch_size * num_queries, num_classes]
         out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
-        out_direction = outputs["pred_directions"].flatten(0, 1)  # [batch_size * num_queries, 2]
+        out_quadrant = outputs["pred_quadrant"].flatten(0, 1)  # [batch_size * num_queries, 1]
+        out_direction = outputs["pred_directions"].flatten(0, 1)  # [batch_size * num_queries, 1]
 
         # Also concat the target labels and boxes
         tgt_ids = torch.cat([v["labels"] for v in targets])
         tgt_bbox = torch.cat([v["boxes"] for v in targets])
+        tgt_quadrant = torch.cat([v["quadrant"] for v in targets])
         tgt_direction = torch.cat([v["directions"] for v in targets])
 
         # Compute the classification cost. Contrary to the loss, we don't use the NLL,
@@ -83,12 +90,17 @@ class HungarianMatcher(nn.Module):
         assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
         cost_giou = -generalized_box_iou(box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox))
 
+        # Compute the quadrant cost. Contrary to the loss, we don't use the NLL,
+        # but approximate it in proba[predict quadrant]- proba[target quadrant].
+        cost_quadrant = out_quadrant - tgt_quadrant
+        
         # Compute the L1 cost between directions
         cost_direction = torch.cdist(out_direction, tgt_direction, p=1)
 
         # Final cost matrix
         C = self.cost_class * cost_class + \
             self.cost_bbox * cost_bbox + self.cost_giou * cost_giou + \
+            self.cost_quadrant * cost_quadrant + \
             self.cost_direction * cost_direction
         C = C.view(bs, num_queries, -1).cpu()
 
@@ -98,7 +110,9 @@ class HungarianMatcher(nn.Module):
         return [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
 
-def build_matcher(args):
-    return HungarianMatcher(cost_class=args.set_cost_class,
-                            cost_bbox=args.set_cost_bbox, cost_giou=args.set_cost_giou,
-                            cost_direction=args.set_cost_direction)
+def build_matcher(cfg: dict = None):
+    return HungarianMatcher(cost_class=cfg["set_cost_class"], 
+                            cost_bbox=cfg["set_cost_bbox"], 
+                            cost_giou=cfg["set_cost_giou"], 
+                            cost_quadrant=cfg["set_cost_quadrant"],
+                            cost_direction=cfg["set_cost_direction"])
