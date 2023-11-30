@@ -56,8 +56,8 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
     # dataset parameters
-    parser.add_argument('--train-path', default='path/Data_files_with_label/train/', help='train dataset path')
-    parser.add_argument('--val-path', default='path/Data_files_with_label/val/', help='val dataset path')
+    parser.add_argument('--train-path', default='/data/share/arya/DOA/train_2/', help='train dataset path')
+    parser.add_argument('--val-path', default='/data/share/arya/DOA/val_2/', help='val dataset path')
     parser.add_argument('--cache-data', default=False, type=bool, help='cache data for faster training')
     parser.add_argument('--output-dir', default='weights/', help='path where to save, empty for no saving')
 
@@ -294,7 +294,7 @@ if __name__ == '__main__':
     parser = get_args_parser()
     args = parser.parse_args()
     # Check if files exist
-    args.hyp = check_file(args.hyp)
+    args.hpy = check_file(args.hpy)
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     main(args)

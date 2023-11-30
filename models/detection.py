@@ -234,7 +234,7 @@ class PostProcess(nn.Module):
         return results
     
     
-class detection(nn.Module):
+class Detection(nn.Module):
     def __init__(self, backbone, transformer, num_classes, num_queries) -> None:
         super().__init__()
         self.num_queries = num_queries
@@ -274,7 +274,7 @@ class detection(nn.Module):
 def build(hyp):
     backbone = build_backbone(hyp)
     transformer = build_transformer(hyp)
-    detection = detection(backbone, 
+    detection = Detection(backbone, 
                           transformer, 
                           hyp['num_classes'], 
                           hyp['num_queries'])
