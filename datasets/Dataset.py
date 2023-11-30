@@ -92,8 +92,8 @@ class LoadDataAndLabels(Dataset):
             "size": torch.as_tensor([self.data_size, self.data_size]),
             "labels": torch.as_tensor(label[:, 0]).long(),
             "boxes": torch.as_tensor(label[:, 1:5]),
-            "quadrant": torch.as_tensor(label[:, 5]),
-            "directions": torch.as_tensor(label[:, 6]),
+            "quadrant": torch.as_tensor(label[:, 5]).view(-1, 1),
+            "directions": torch.as_tensor(label[:, 6]).view(-1, 1),
         }
         
         return data, labels_out

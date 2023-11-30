@@ -92,7 +92,7 @@ class HungarianMatcher(nn.Module):
 
         # Compute the quadrant cost. Contrary to the loss, we don't use the NLL,
         # but approximate it in proba[predict quadrant]- proba[target quadrant].
-        cost_quadrant = out_quadrant - tgt_quadrant
+        cost_quadrant = torch.abs(out_quadrant - tgt_quadrant.T)
         
         # Compute the L1 cost between directions
         cost_direction = torch.cdist(out_direction, tgt_direction, p=1)

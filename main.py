@@ -51,7 +51,7 @@ def get_args_parser():
     parser.add_argument('--lrf', default=0.001, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
     parser.add_argument('--epochs', default=1000, type=int)
-    parser.add_argument('--batch_size', default=64, type=int)
+    parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
@@ -139,9 +139,11 @@ def main(args):
     print("Model generating...")
     model, criterion, postprocessors = build(cfg)
     model.to(device)
-    if args.rank in [-1, 0] and tb_writer:
-        tb_writer.add_graph(model, torch.rand((1, 12, 512, 512), 
-                                              device=device, dtype=torch.float), use_strict_trace=False)
+    
+    # if utils.is_main_process() and tb_writer:
+    #     tb_writer.add_graph(model, torch.rand((1, 12, 512, 512), 
+    #                                           device=device, dtype=torch.float),
+    #                         use_strict_trace=False)
     
      # load previous model if resume training
     start_epoch = 0

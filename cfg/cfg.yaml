@@ -6,7 +6,7 @@ drop_path: 0.2
 Encoder_attention: False
 
 # Transformer
-num_decoder_layers: 8
+num_decoder_layers: 4
 d_model: 512
 nhead: 4
 dim_feedforward: 1024

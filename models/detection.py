@@ -86,6 +86,7 @@ class SetCriterion(nn.Module):
             'labels': self.loss_labels,
             'cardinality': self.loss_cardinality,
             'boxes': self.loss_boxes,
+            'quadrant': self.loss_quadrant,
             'directions': self.loss_directions,
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
@@ -105,7 +106,7 @@ class SetCriterion(nn.Module):
                                     dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_o
 
-        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
+        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight.to(src_logits.device))
         losses = {'loss_ce': loss_ce}
 
         if log:
@@ -251,7 +252,7 @@ class Detection(nn.Module):
     def forward(self, inputs):
         features = self.backbone(inputs)
         pos = self.pos_embed(features)
-        hs = self.transformer(tgt=self.query_embed.weight.unsqueeze(0), 
+        hs = self.transformer(tgt=self.query_embed.weight.unsqueeze(0).repeat(inputs.shape[0], 1, 1), 
                               memory=features, 
                               pos=pos)
         
