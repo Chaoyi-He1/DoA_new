@@ -343,6 +343,7 @@ class Transformer_Decoder(nn.Module):
         super(Transformer_Decoder, self).__init__()
         self.num_layers = num_layers
         self.norm = norm
+        self.d_model = d_model
         self.layer_args = {
             "d_model": d_model,
             "nhead": nhead,

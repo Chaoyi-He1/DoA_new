@@ -251,7 +251,7 @@ class Detection(nn.Module):
     def forward(self, inputs):
         features = self.backbone(inputs)
         pos = self.pos_embed(features)
-        hs = self.transformer(tgt=self.query_embed.weight, 
+        hs = self.transformer(tgt=self.query_embed.weight.unsqueeze(0), 
                               memory=features, 
                               pos=pos)
         
