@@ -65,7 +65,7 @@ class HungarianMatcher(nn.Module):
         # We flatten to compute the cost matrices in a batch
         out_prob = outputs["pred_logits"].flatten(0, 1).softmax(-1)  # [batch_size * num_queries, num_classes]
         out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
-        out_quadrant = outputs["pred_quadrant"].flatten(0, 1)  # [batch_size * num_queries, 1]
+        out_quadrant = outputs["pred_quadrant"].flatten(0, 1).softmax(-1)  # [batch_size * num_queries, 1]
         out_direction = outputs["pred_directions"].flatten(0, 1).softmax(-1)  # [batch_size * num_queries, 1]
 
         # Also concat the target labels and boxes
@@ -92,7 +92,7 @@ class HungarianMatcher(nn.Module):
 
         # Compute the quadrant cost. Contrary to the loss, we don't use the NLL,
         # but approximate it in proba[predict quadrant]- proba[target quadrant].
-        cost_quadrant = torch.abs(out_quadrant - tgt_quadrant.T)
+        cost_quadrant = -out_quadrant[:, tgt_quadrant]
         
         # Compute the L1 cost between directions
         assert torch.max(tgt_direction) <= 90, "directions should be in range [0, 90]"

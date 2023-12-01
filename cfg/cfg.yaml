@@ -3,10 +3,10 @@ in_type: '1d'
 data_size: 512
 in_channels: 12
 drop_path: 0.2
-Encoder_attention: False
+Encoder_attention: True
 
 # Transformer
-num_decoder_layers: 4
+num_decoder_layers: 8
 d_model: 512
 nhead: 4
 dim_feedforward: 1024
@@ -16,19 +16,20 @@ normalize_before: True
 
 # detection parameters
 num_classes: 3
+deg_step: 2.0
 num_queries: 20
 
 # matcher parameters
-set_cost_class: 2.0
+set_cost_class: 0.0
 set_cost_bbox: 0.0
 set_cost_giou: 0.0
-set_cost_quadrant: 4.0
-set_cost_direction: 6.0
+set_cost_quadrant: 1.0
+set_cost_direction: 8.0
 
 # loss parameters
-ce_loss_coef: 2.0
+ce_loss_coef: 0.0
 bbox_loss_coef: 0.0
 giou_loss_coef: 0.0
 eos_coef: 0.1
-quadrant_loss_coef: 4.0
-direction_loss_coef: 6.0
+quadrant_loss_coef: 1.0
+direction_loss_coef: 8.0

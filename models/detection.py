@@ -50,7 +50,7 @@ class SetCriterion(nn.Module):
             1) we compute hungarian assignment between ground truth and the outputs of the model
             2) we supervise each pair of matched ground-truth / prediction (supervise class and box)
     """
-    def __init__(self, num_classes, matcher, weight_dict, eos_coef, losses):
+    def __init__(self, num_classes, num_deg, matcher, weight_dict, eos_coef, losses):
         """ Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
@@ -61,6 +61,7 @@ class SetCriterion(nn.Module):
         """
         super(SetCriterion, self).__init__()
         self.num_classes = num_classes
+        self.num_deg = num_deg
         self.matcher = matcher
         self.weight_dict = weight_dict
         self.eos_coef = eos_coef
@@ -68,6 +69,12 @@ class SetCriterion(nn.Module):
         empty_weight = torch.ones(self.num_classes + 1)
         empty_weight[-1] = self.eos_coef
         self.register_buffer('empty_weight', empty_weight)
+        quadrant_weight = torch.ones(3)
+        quadrant_weight[-1] = self.eos_coef
+        self.register_buffer('quadrant_weight', quadrant_weight)
+        direction_weight = torch.ones(num_deg + 1)
+        direction_weight[-1] = self.eos_coef
+        self.register_buffer('direction_weight', direction_weight)
         # self.register_buffer('weight_dict', weight_dict)
 
     def _get_src_permutation_idx(self, indices):
@@ -150,35 +157,49 @@ class SetCriterion(nn.Module):
         losses['loss_giou'] = loss_giou.sum() / num_boxes
         return losses
 
-    def loss_directions(self, outputs, targets, indices, num_directions):
+    def loss_directions(self, outputs, targets, indices, num_directions, log=True):
         """Compute the losses related to the angle: the L1 regression loss.
            targets dicts must contain the key "directions" containing a tensor of dim [nb_target_boxes, angle]
         """
-        assert "pred_directions" in outputs
+        assert 'pred_directions' in outputs
+        src_directions = outputs['pred_directions']
+
         idx = self._get_src_permutation_idx(indices)
-        src_directions = outputs['pred_directions'][idx]
-        target_directions = torch.cat([t['directions'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        target_directions_o = torch.cat([t["directions"][J] for t, (_, J) in zip(targets, indices)])
+        target_directions = torch.full(src_directions.shape[:2], self.num_deg,
+                                    dtype=torch.int64, device=src_directions.device)
+        target_directions[idx] = target_directions_o
 
-        loss_directions = F.cross_entropy(src_directions, 
-                                          target_directions, reduction='none')
+        loss_directions = F.cross_entropy(src_directions.transpose(1, 2).contiguous(), 
+                                          target_directions, 
+                                          self.direction_weight.to(src_directions.device))
+        losses = {'loss_directions': loss_directions}
 
-        losses = {'loss_directions': loss_directions.sum() / num_directions}
-        losses['direction_error'] = 100 - accuracy(src_directions, target_directions)[0]
+        if log:
+            # TODO this should probably be a separate loss, not hacked in this one here
+            losses['directions_error'] = 100 - accuracy(src_directions[idx], target_directions_o)[0]
         return losses
     
-    def loss_quadrant(self, outputs, targets, indices, num_quadrants):
+    def loss_quadrant(self, outputs, targets, indices, num_quadrants, log=True):
         """Compute the losses related to the quadrant: the BCE loss.
            targets dicts must contain the key "quadrant" containing a tensor of dim [nb_target_boxes, quadrant]
         """
-        assert "pred_directions" in outputs
+        assert 'pred_quadrant' in outputs
+        src_quadrant = outputs['pred_quadrant']
+
         idx = self._get_src_permutation_idx(indices)
-        src_quadrant = outputs['pred_quadrant'][idx]
-        target_quadrant = torch.cat([t['quadrant'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        target_quadrant_o = torch.cat([t["quadrant"][J] for t, (_, J) in zip(targets, indices)])
+        target_quadrant = torch.full(src_quadrant.shape[:2], 2,
+                                    dtype=torch.int64, device=src_quadrant.device)
+        target_quadrant[idx] = target_quadrant_o
 
-        loss_quadrant = F.binary_cross_entropy_with_logits(src_quadrant, target_quadrant, reduction='none')
+        loss_quadrant = F.cross_entropy(src_quadrant.transpose(1, 2).contiguous(), 
+                                        target_quadrant, self.quadrant_weight.to(src_quadrant.device))
+        losses = {'loss_quadrant': loss_quadrant}
 
-        losses = {'loss_quadrant': loss_quadrant.sum() / num_quadrants}
-        losses['quadrant_error'] = 100 - accuracy(src_quadrant, target_quadrant)[0]
+        if log:
+            # TODO this should probably be a separate loss, not hacked in this one here
+            losses['quadrant_error'] = 100 - accuracy(src_quadrant[idx], target_quadrant_o)[0]
         return losses
 
     def forward(self, outputs, targets):
@@ -241,7 +262,7 @@ class PostProcess(nn.Module):
     
     
 class Detection(nn.Module):
-    def __init__(self, backbone, transformer, num_classes, num_queries) -> None:
+    def __init__(self, backbone, transformer, num_classes, num_queries, num_deg) -> None:
         super().__init__()
         self.num_queries = num_queries
         self.backbone = backbone
@@ -249,8 +270,8 @@ class Detection(nn.Module):
         hidden_dim = transformer.d_model
         self.class_embed = MLP(hidden_dim, hidden_dim * 2, num_classes + 1, 3)
         self.bbox_embed = MLP(hidden_dim, hidden_dim * 2, 4, 3)
-        self.quadrant_embed = MLP(hidden_dim, hidden_dim * 2, 1, 3)
-        self.direction_embed = MLP(hidden_dim, hidden_dim * 2, 91, 3)
+        self.quadrant_embed = MLP(hidden_dim, hidden_dim * 2, 3, 3)
+        self.direction_embed = MLP(hidden_dim, hidden_dim * 2, num_deg + 1, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.pos_embed = build_position_encoding('sine', hidden_dim)
     
@@ -283,7 +304,8 @@ def build(hyp):
     detection = Detection(backbone, 
                           transformer, 
                           hyp['num_classes'], 
-                          hyp['num_queries'])
+                          hyp['num_queries'],
+                          int(90 / hyp['deg_step'] + 1))
     matcher = build_matcher(hyp)
     
     weight_dict = {'loss_ce': hyp['ce_loss_coef'], 
@@ -295,6 +317,7 @@ def build(hyp):
     losses = ['labels', 'boxes', 'quadrant', 'directions']   # 
     
     criterion = SetCriterion(hyp['num_classes'],
+                             int(90 / hyp['deg_step'] + 1), 
                              matcher=matcher,
                              weight_dict=weight_dict,
                              eos_coef=hyp['eos_coef'],

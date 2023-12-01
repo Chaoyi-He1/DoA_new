@@ -57,7 +57,7 @@ def get_args_parser():
 
     # dataset parameters
     parser.add_argument('--train-path', default='/data/share/arya/DOA/train_2/', help='train dataset path')
-    parser.add_argument('--val-path', default='/data/share/arya/DOA/val_2/', help='val dataset path')
+    parser.add_argument('--val-path', default='/data/share/arya/DOA/train_2/', help='val dataset path')
     parser.add_argument('--cache-data', default=False, type=bool, help='cache data for faster training')
     parser.add_argument('--output-dir', default='weights/', help='path where to save, empty for no saving')
 
@@ -108,9 +108,9 @@ def main(args):
     # dataset generate
     print("DoA dataset generating...")
     dataset_train = LoadDataAndLabels(folder_path=args.train_path, cache=args.cache_data, train=True,
-                                      data_size=cfg['data_size'], rank=args.rank)
+                                      deg_step=cfg['deg_step'], data_size=cfg['data_size'], rank=args.rank)
     dataset_val = LoadDataAndLabels(folder_path=args.val_path, cache=args.cache_data, train=False,
-                                    data_size=cfg['data_size'], rank=args.rank)
+                                    deg_step=cfg['deg_step'], data_size=cfg['data_size'], rank=args.rank)
     print("DoA dataset generated.")
     
     if args.distributed:
