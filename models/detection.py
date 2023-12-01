@@ -62,13 +62,13 @@ class SetCriterion(nn.Module):
         super(SetCriterion, self).__init__()
         self.num_classes = num_classes
         self.matcher = matcher
-        # self.weight_dict = weight_dict
+        self.weight_dict = weight_dict
         self.eos_coef = eos_coef
         self.losses = losses
         empty_weight = torch.ones(self.num_classes + 1)
         empty_weight[-1] = self.eos_coef
         self.register_buffer('empty_weight', empty_weight)
-        self.register_buffer('weight_dict', weight_dict)
+        # self.register_buffer('weight_dict', weight_dict)
 
     def _get_src_permutation_idx(self, indices):
         # permute predictions following indices
