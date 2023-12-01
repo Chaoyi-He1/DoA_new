@@ -62,12 +62,13 @@ class SetCriterion(nn.Module):
         super(SetCriterion, self).__init__()
         self.num_classes = num_classes
         self.matcher = matcher
-        self.weight_dict = weight_dict
+        # self.weight_dict = weight_dict
         self.eos_coef = eos_coef
         self.losses = losses
         empty_weight = torch.ones(self.num_classes + 1)
         empty_weight[-1] = self.eos_coef
         self.register_buffer('empty_weight', empty_weight)
+        self.register_buffer('weight_dict', weight_dict)
 
     def _get_src_permutation_idx(self, indices):
         # permute predictions following indices
@@ -106,7 +107,8 @@ class SetCriterion(nn.Module):
                                     dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_o
 
-        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight.to(src_logits.device))
+        loss_ce = F.cross_entropy(src_logits.transpose(1, 2).contiguous(), 
+                                  target_classes, self.empty_weight.to(src_logits.device))
         losses = {'loss_ce': loss_ce}
 
         if log:
@@ -157,9 +159,11 @@ class SetCriterion(nn.Module):
         src_directions = outputs['pred_directions'][idx]
         target_directions = torch.cat([t['directions'][i] for t, (_, i) in zip(targets, indices)], dim=0)
 
-        loss_directions = F.l1_loss(src_directions, target_directions, reduction='none')
+        loss_directions = F.cross_entropy(src_directions, 
+                                          target_directions, reduction='none')
 
         losses = {'loss_directions': loss_directions.sum() / num_directions}
+        losses['direction_error'] = 100 - accuracy(src_directions, target_directions)[0]
         return losses
     
     def loss_quadrant(self, outputs, targets, indices, num_quadrants):
@@ -168,12 +172,13 @@ class SetCriterion(nn.Module):
         """
         assert "pred_directions" in outputs
         idx = self._get_src_permutation_idx(indices)
-        src_directions = outputs['pred_quadrant'][idx]
-        target_directions = torch.cat([t['quadrant'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        src_quadrant = outputs['pred_quadrant'][idx]
+        target_quadrant = torch.cat([t['quadrant'][i] for t, (_, i) in zip(targets, indices)], dim=0)
 
-        loss_quadrant = F.binary_cross_entropy_with_logits(src_directions, target_directions, reduction='none')
+        loss_quadrant = F.binary_cross_entropy_with_logits(src_quadrant, target_quadrant, reduction='none')
 
         losses = {'loss_quadrant': loss_quadrant.sum() / num_quadrants}
+        losses['quadrant_error'] = 100 - accuracy(src_quadrant, target_quadrant)[0]
         return losses
 
     def forward(self, outputs, targets):
@@ -245,7 +250,7 @@ class Detection(nn.Module):
         self.class_embed = MLP(hidden_dim, hidden_dim * 2, num_classes + 1, 3)
         self.bbox_embed = MLP(hidden_dim, hidden_dim * 2, 4, 3)
         self.quadrant_embed = MLP(hidden_dim, hidden_dim * 2, 1, 3)
-        self.direction_embed = MLP(hidden_dim, hidden_dim * 2, 1, 3)
+        self.direction_embed = MLP(hidden_dim, hidden_dim * 2, 91, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.pos_embed = build_position_encoding('sine', hidden_dim)
     
@@ -258,12 +263,12 @@ class Detection(nn.Module):
         
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs)
-        max_coord = outputs_coord.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
-        outputs_coord = (outputs_coord / max_coord).sigmoid()
+        # max_coord = outputs_coord.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
+        outputs_coord = outputs_coord.sigmoid()
         outputs_quadrant = self.quadrant_embed(hs).sigmoid()
         outputs_direction = self.direction_embed(hs)
-        max_direction = outputs_direction.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
-        outputs_direction = (outputs_direction / max_direction).sigmoid()
+        # max_direction = outputs_direction.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
+        # outputs_direction = (outputs_direction / max_direction).sigmoid()
         
         out = {'pred_logits': outputs_class, 
                'pred_boxes': outputs_coord, 
@@ -287,7 +292,7 @@ def build(hyp):
                    'loss_quadrant': hyp['quadrant_loss_coef'], 
                    'loss_directions': hyp['direction_loss_coef'],
                    }
-    losses = ['labels', 'boxes', 'quadrant', 'directions']
+    losses = ['labels', 'boxes', 'quadrant', 'directions']   # 
     
     criterion = SetCriterion(hyp['num_classes'],
                              matcher=matcher,

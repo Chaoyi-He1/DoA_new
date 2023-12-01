@@ -66,7 +66,7 @@ class HungarianMatcher(nn.Module):
         out_prob = outputs["pred_logits"].flatten(0, 1).softmax(-1)  # [batch_size * num_queries, num_classes]
         out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
         out_quadrant = outputs["pred_quadrant"].flatten(0, 1)  # [batch_size * num_queries, 1]
-        out_direction = outputs["pred_directions"].flatten(0, 1)  # [batch_size * num_queries, 1]
+        out_direction = outputs["pred_directions"].flatten(0, 1).softmax(-1)  # [batch_size * num_queries, 1]
 
         # Also concat the target labels and boxes
         tgt_ids = torch.cat([v["labels"] for v in targets])
@@ -95,7 +95,8 @@ class HungarianMatcher(nn.Module):
         cost_quadrant = torch.abs(out_quadrant - tgt_quadrant.T)
         
         # Compute the L1 cost between directions
-        cost_direction = torch.cdist(out_direction, tgt_direction, p=1)
+        assert torch.max(tgt_direction) <= 90, "directions should be in range [0, 90]"
+        cost_direction = -out_direction[:, tgt_direction]
 
         # Final cost matrix
         C = self.cost_class * cost_class + \

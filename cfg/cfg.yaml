@@ -19,16 +19,16 @@ num_classes: 3
 num_queries: 20
 
 # matcher parameters
-set_cost_class: 1.0
-set_cost_bbox: 2.0
-set_cost_giou: 5.0
-set_cost_quadrant: 2.0
+set_cost_class: 2.0
+set_cost_bbox: 0.0
+set_cost_giou: 0.0
+set_cost_quadrant: 4.0
 set_cost_direction: 6.0
 
 # loss parameters
-ce_loss_coef: 1.0
-bbox_loss_coef: 2.0
-giou_loss_coef: 5.0
+ce_loss_coef: 2.0
+bbox_loss_coef: 0.0
+giou_loss_coef: 0.0
 eos_coef: 0.1
-quadrant_loss_coef: 2.0
+quadrant_loss_coef: 4.0
 direction_loss_coef: 6.0
