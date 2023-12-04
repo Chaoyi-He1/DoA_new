@@ -8,10 +8,10 @@ Encoder_attention: True
 # Transformer
 num_decoder_layers: 8
 d_model: 512
-nhead: 4
-dim_feedforward: 1024
+nhead: 8
+dim_feedforward: 2048
 dropout: 0.2
-activation: 'gelu'
+activation: 'relu'
 normalize_before: True
 
 # detection parameters
