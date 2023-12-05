@@ -1,12 +1,12 @@
 # backbone
-in_type: '1d'
+in_type: '2d'
 data_size: 512
 in_channels: 12
 drop_path: 0.2
 Encoder_attention: True
 
 # Transformer
-num_decoder_layers: 8
+num_decoder_layers: 16
 d_model: 512
 nhead: 8
 dim_feedforward: 2048
@@ -16,8 +16,8 @@ normalize_before: True
 
 # detection parameters
 num_classes: 3
-deg_step: 2.0
-num_queries: 20
+deg_step: 3.0
+num_queries: 90
 
 # matcher parameters
 set_cost_class: 0.0
@@ -30,6 +30,6 @@ set_cost_direction: 8.0
 ce_loss_coef: 0.0
 bbox_loss_coef: 0.0
 giou_loss_coef: 0.0
-eos_coef: 0.1
+eos_coef: 0.4
 quadrant_loss_coef: 1.0
 direction_loss_coef: 8.0

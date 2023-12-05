@@ -268,10 +268,10 @@ class Detection(nn.Module):
         self.backbone = backbone
         self.transformer = transformer
         hidden_dim = transformer.d_model
-        self.class_embed = MLP(hidden_dim, hidden_dim * 2, num_classes + 1, 3)
-        self.bbox_embed = MLP(hidden_dim, hidden_dim * 2, 4, 3)
-        self.quadrant_embed = MLP(hidden_dim, hidden_dim * 2, 3, 3)
-        self.direction_embed = MLP(hidden_dim, hidden_dim * 2, num_deg + 1, 3)
+        self.class_embed = MLP(hidden_dim, hidden_dim, num_classes + 1, 1)
+        self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 1)
+        self.quadrant_embed = MLP(hidden_dim, hidden_dim, 3, 2)
+        self.direction_embed = MLP(hidden_dim, hidden_dim * 3, num_deg + 1, 4)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.pos_embed = build_position_encoding('sine', hidden_dim)
     
@@ -305,7 +305,7 @@ def build(hyp):
                           transformer, 
                           hyp['num_classes'], 
                           hyp['num_queries'],
-                          int(90 / hyp['deg_step'] + 1))
+                          int(180 / hyp['deg_step'] + 1))
     matcher = build_matcher(hyp)
     
     weight_dict = {'loss_ce': hyp['ce_loss_coef'], 
@@ -317,7 +317,7 @@ def build(hyp):
     losses = ['labels', 'boxes', 'quadrant', 'directions']   # 
     
     criterion = SetCriterion(hyp['num_classes'],
-                             int(90 / hyp['deg_step'] + 1), 
+                             int(180 / hyp['deg_step'] + 1), 
                              matcher=matcher,
                              weight_dict=weight_dict,
                              eos_coef=hyp['eos_coef'],
