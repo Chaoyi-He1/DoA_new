@@ -95,7 +95,7 @@ class HungarianMatcher(nn.Module):
         cost_quadrant = -out_quadrant[:, tgt_quadrant]
         
         # Compute the L1 cost between directions
-        assert torch.max(tgt_direction) <= 90, "directions should be in range [0, 90]"
+        assert torch.max(tgt_direction) <= 60, "directions should be in range [0, 90]"
         cost_direction = -out_direction[:, tgt_direction]
 
         # Final cost matrix

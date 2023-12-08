@@ -54,6 +54,7 @@ class LoadDataAndLabels(Dataset):
             pbar = range(len(self.label_files))
         
         max_deg, min_deg = 0, np.inf
+        max_deg_idx, min_deg_idx = 0, np.inf
         for i in pbar:
             label_path = self.label_files[i]
             with open(label_path, 'r') as f:
@@ -62,11 +63,15 @@ class LoadDataAndLabels(Dataset):
             assert (label >= 0).all(), "negative labels: %s" % label_path
             assert (label[:, 1:] <= 1).all(), "non-normalized or out of bounds coordinate labels: %s" % label_path
             
-            max_deg = max(max_deg, np.max(label[:, 6]))
-            min_deg = min(min_deg, np.min(label[:, 6]))
+            max_deg = max(max_deg, np.max(label[:, 6] * 90 + 90 * label[:, 5]))
+            min_deg = min(min_deg, np.min(label[:, 6] * 90 + 90 * label[:, 5]))
+            max_deg_idx = max(max_deg_idx, np.max(label[:, 6] * 90 + 90 * label[:, 5]) // self.deg_step)
+            min_deg_idx = min(min_deg_idx, np.min(label[:, 6] * 90 + 90 * label[:, 5]) // self.deg_step)
         
         print('Max degree: ', max_deg)
         print('Min degree: ', min_deg)
+        print('Max degree index: ', max_deg_idx)
+        print('Min degree index: ', min_deg_idx)
         self.max_deg = max_deg
         self.min_deg = min_deg
         

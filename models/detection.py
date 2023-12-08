@@ -173,6 +173,12 @@ class SetCriterion(nn.Module):
         loss_directions = F.cross_entropy(src_directions.transpose(1, 2).contiguous(), 
                                           target_directions, 
                                           self.direction_weight.to(src_directions.device))
+        
+        # idx = self._get_src_permutation_idx(indices)
+        # src_directions = outputs['pred_directions'][idx]
+        # target_directions = torch.cat([t['directions'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        # loss_directions = F.cross_entropy(src_directions, target_directions)
+        
         losses = {'loss_directions': loss_directions}
 
         if log:

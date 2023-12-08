@@ -1,15 +1,15 @@
 # backbone
-in_type: '2d'
+in_type: '1d'
 data_size: 512
 in_channels: 12
 drop_path: 0.2
 Encoder_attention: True
 
 # Transformer
-num_decoder_layers: 16
+num_decoder_layers: 4
 d_model: 512
 nhead: 8
-dim_feedforward: 2048
+dim_feedforward: 1024
 dropout: 0.2
 activation: 'relu'
 normalize_before: True
@@ -23,13 +23,13 @@ num_queries: 90
 set_cost_class: 0.0
 set_cost_bbox: 0.0
 set_cost_giou: 0.0
-set_cost_quadrant: 1.0
-set_cost_direction: 8.0
+set_cost_quadrant: 2.0
+set_cost_direction: 1.0
 
 # loss parameters
 ce_loss_coef: 0.0
 bbox_loss_coef: 0.0
 giou_loss_coef: 0.0
-eos_coef: 0.4
+eos_coef: 0.1
 quadrant_loss_coef: 1.0
-direction_loss_coef: 8.0
+direction_loss_coef: 2.0

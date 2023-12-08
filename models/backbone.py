@@ -189,7 +189,7 @@ class Conv1d_AutoEncoder(nn.Module):
         self.temp_dim //= 2
 
         self.ResNet = nn.ModuleList()
-        res_params = list(zip([4, 8, 8, 8, 4], [5, 9, 11, 11, 13],   # num_blocks, kernel_size
+        res_params = list(zip([2, 4, 4, 8, 4], [5, 5, 7, 9, 9],   # num_blocks, kernel_size
                               [3, 3, 3, 3, 3], [1, 5, 5, 3, 3]))     # stride, dilation
         # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
         for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
