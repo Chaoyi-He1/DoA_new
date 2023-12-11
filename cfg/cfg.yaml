@@ -17,14 +17,14 @@ normalize_before: True
 # detection parameters
 num_classes: 3
 deg_step: 3.0
-num_queries: 90
+num_queries: 61
 
 # matcher parameters
 set_cost_class: 0.0
 set_cost_bbox: 0.0
 set_cost_giou: 0.0
 set_cost_quadrant: 2.0
-set_cost_direction: 1.0
+set_cost_direction: 20.0
 
 # loss parameters
 ce_loss_coef: 0.0
