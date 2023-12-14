@@ -303,7 +303,7 @@ class Detection(nn.Module):
         outputs_coord = outputs_coord.sigmoid()
         outputs_quadrant = self.quadrant_embed(hs).sigmoid()
         outputs_direction = torch.stack([self.direction_embed[i](hs[:, i, ...]) 
-                                         for i in range(self.num_queries)], dim=1).softmax(-1)
+                                         for i in range(self.num_queries)], dim=1)
         # max_direction = outputs_direction.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
         # outputs_direction = (outputs_direction / max_direction).sigmoid()
         
