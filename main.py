@@ -50,14 +50,14 @@ def get_args_parser():
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--lrf', default=0.001, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
-    parser.add_argument('--epochs', default=1000, type=int)
+    parser.add_argument('--epochs', default=100, type=int)
     parser.add_argument('--batch_size', default=8, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
     # dataset parameters
     parser.add_argument('--train-path', default='/data/share/arya/DOA/train_2/', help='train dataset path')
-    parser.add_argument('--val-path', default='/data/share/arya/DOA/train_2/', help='val dataset path')
+    parser.add_argument('--val-path', default='/data/share/arya/DOA/val_2/', help='val dataset path')
     parser.add_argument('--cache-data', default=False, type=bool, help='cache data for faster training')
     parser.add_argument('--output-dir', default='weights/', help='path where to save, empty for no saving')
 
@@ -208,7 +208,7 @@ def main(args):
     # learning rate scheduler setting
     # After using DDP, the gradients on each device will be averaged, so the learning rate needs to be enlarged
     args.lr *= max(1., args.world_size * args.batch_size / 64)
-    optimizer = torch.optim.Adam(params_to_optimize, lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = torch.optim.AdamW(params_to_optimize, lr=args.lr, weight_decay=args.weight_decay)
     lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - args.lrf) + args.lrf  # cosine
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch  # do not move

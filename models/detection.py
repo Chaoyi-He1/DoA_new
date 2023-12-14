@@ -163,27 +163,27 @@ class SetCriterion(nn.Module):
         """
         assert 'pred_directions' in outputs
         
-        # src_directions = outputs['pred_directions']
-        # idx = self._get_src_permutation_idx(indices)
-        # target_directions_o = torch.cat([t["directions"][J] for t, (_, J) in zip(targets, indices)])
-        # target_directions = torch.full(src_directions.shape[:2], self.num_deg,
-        #                             dtype=torch.int64, device=src_directions.device)
-        # target_directions[idx] = target_directions_o
-
-        # loss_directions = F.cross_entropy(src_directions.transpose(1, 2).contiguous(), 
-        #                                   target_directions, 
-        #                                   self.direction_weight.to(src_directions.device))
-        
+        src_directions = outputs['pred_directions']
         idx = self._get_src_permutation_idx(indices)
-        src_directions = outputs['pred_directions'][idx]
-        target_directions = torch.cat([t['directions'][i] for t, (_, i) in zip(targets, indices)], dim=0)
-        loss_directions = F.mse_loss(src_directions, target_directions)
+        target_directions_o = torch.cat([t["directions"][J] for t, (_, J) in zip(targets, indices)])
+        target_directions = torch.full(src_directions.shape[:2], self.num_deg,
+                                    dtype=torch.int64, device=src_directions.device)
+        target_directions[idx] = target_directions_o
+
+        loss_directions = F.cross_entropy(src_directions.transpose(1, 2).contiguous(), 
+                                          target_directions, 
+                                          self.direction_weight.to(src_directions.device))
+        
+        # idx = self._get_src_permutation_idx(indices)
+        # src_directions = outputs['pred_directions'][idx]
+        # target_directions = torch.cat([t['directions'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        # loss_directions = F.mse_loss(src_directions, target_directions)
         
         losses = {'loss_directions': loss_directions}
 
-        # if log:
-        #     # TODO this should probably be a separate loss, not hacked in this one here
-        #     losses['directions_error'] = 100 - accuracy(src_directions[idx], target_directions_o)[0]
+        if log:
+            # TODO this should probably be a separate loss, not hacked in this one here
+            losses['directions_error'] = 100 - accuracy(src_directions[idx], target_directions_o)[0]
         return losses
     
     def loss_quadrant(self, outputs, targets, indices, num_quadrants, log=True):
@@ -201,6 +201,15 @@ class SetCriterion(nn.Module):
 
         loss_quadrant = F.cross_entropy(src_quadrant.transpose(1, 2).contiguous(), 
                                         target_quadrant, self.quadrant_weight.to(src_quadrant.device))
+        
+        # loss_quadrant = F.cross_entropy(src_quadrant[0],
+        #                                 target_quadrant[0],
+        #                                 self.quadrant_weight.to(src_quadrant.device))
+        # for i in range(1, src_quadrant.shape[0]):
+        #     loss_quadrant += F.cross_entropy(src_quadrant[i],
+        #                                      target_quadrant[i],
+        #                                      self.quadrant_weight.to(src_quadrant.device))
+        
         losses = {'loss_quadrant': loss_quadrant}
 
         if log:
@@ -276,8 +285,8 @@ class Detection(nn.Module):
         hidden_dim = transformer.d_model
         self.class_embed = MLP(hidden_dim, hidden_dim, num_classes + 1, 1)
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 1)
-        self.quadrant_embed = MLP(hidden_dim, hidden_dim, 3, 2)
-        self.direction_embed = MLP(hidden_dim, hidden_dim * 3, 1, 4)
+        self.quadrant_embed = MLP(hidden_dim, hidden_dim * 3, 3, 2)
+        self.direction_embed = nn.ModuleList([MLP(hidden_dim, hidden_dim * 3, num_deg + 1, 4)] * num_queries)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.pos_embed = build_position_encoding('sine', hidden_dim)
     
@@ -293,7 +302,8 @@ class Detection(nn.Module):
         # max_coord = outputs_coord.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
         outputs_coord = outputs_coord.sigmoid()
         outputs_quadrant = self.quadrant_embed(hs).sigmoid()
-        outputs_direction = self.direction_embed(hs)
+        outputs_direction = torch.stack([self.direction_embed[i](hs[:, i, ...]) 
+                                         for i in range(self.num_queries)], dim=1).softmax(-1)
         # max_direction = outputs_direction.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
         # outputs_direction = (outputs_direction / max_direction).sigmoid()
         
@@ -311,7 +321,7 @@ def build(hyp):
                           transformer, 
                           hyp['num_classes'], 
                           hyp['num_queries'],
-                          int(180 / hyp['deg_step'] + 1))
+                          int(180 // hyp['deg_step'] + 1))
     matcher = build_matcher(hyp)
     
     weight_dict = {'loss_ce': hyp['ce_loss_coef'], 
@@ -323,7 +333,7 @@ def build(hyp):
     losses = ['labels', 'boxes', 'quadrant', 'directions']   # 
     
     criterion = SetCriterion(hyp['num_classes'],
-                             int(180 / hyp['deg_step'] + 1), 
+                             int(180 // hyp['deg_step'] + 1), 
                              matcher=matcher,
                              weight_dict=weight_dict,
                              eos_coef=hyp['eos_coef'],

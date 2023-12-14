@@ -35,7 +35,7 @@ class HungarianMatcher(nn.Module):
         self.cost_giou = cost_giou
         self.cost_quadrant = cost_quadrant
         self.cost_direction = cost_direction
-        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0 or cost_direction != 0, "all costs cant be 0"
+        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0 or cost_direction != 0 or cost_quadrant != 0, "all costs cant be 0"
 
     @torch.no_grad()
     def forward(self, outputs, targets):
@@ -96,8 +96,8 @@ class HungarianMatcher(nn.Module):
         
         # Compute the L1 cost between directions
         assert torch.max(tgt_direction) <= 180, "directions should be in range [0, 90]"
-        # cost_direction = -out_direction[:, tgt_direction]
-        cost_direction = torch.cdist(out_direction, tgt_direction, p=1)
+        cost_direction = -out_direction[:, tgt_direction]
+        # cost_direction = torch.cdist(out_direction, tgt_direction, p=1)
 
         # Final cost matrix
         C = self.cost_class * cost_class + \

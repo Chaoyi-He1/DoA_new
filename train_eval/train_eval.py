@@ -20,7 +20,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     
     header = 'Epoch: [{}]'.format(epoch)
     
-    for samples, targets in metric_logger.log_every(data_loader, 10, header):
+    for samples, targets in metric_logger.log_every(data_loader, 50, header):
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         

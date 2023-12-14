@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 
 def read_data_pickle(data_path, data_size):
-    data = np.fromfile(data_path, dtype=np.float32).reshape(6144, 512)
+    data = np.fromfile(data_path, dtype=np.float32).reshape(-1, 512)
     data = np.asarray(data, dtype=float)
     data = np.reshape(data, newshape=(-1, data_size, data_size)) if len(data.shape) != 3 else data
     assert not (np.isnan(data)).any()
@@ -125,7 +125,7 @@ class LoadDataAndLabels(Dataset):
             "labels": torch.as_tensor(label[:, 0]).long(),
             "boxes": torch.as_tensor(label[:, 1:5]),
             "quadrant": torch.as_tensor(label[:, 5]).long(),
-            "directions": torch.as_tensor(label[:, 6] * 90 + 90 * label[:, 5]).view(-1, 1),
+            "directions": torch.as_tensor((label[:, 6] * 90 + 90 * label[:, 5]) // self.deg_step).long(),
         }
         
         return data, labels_out
