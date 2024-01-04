@@ -16,9 +16,10 @@ from tqdm import tqdm
 
 
 def read_data_pickle(data_path, data_size):
-    data = np.fromfile(data_path, dtype=np.float32).reshape(-1, 512)
+    # data = np.fromfile(data_path, dtype=np.float32).reshape(-1, 512)
+    data = np.fromfile(data_path, dtype=np.float32).reshape((512, 512, 20)).transpose((2, 1, 0))
     data = np.asarray(data, dtype=float)
-    data = np.reshape(data, newshape=(-1, data_size, data_size)) if len(data.shape) != 3 else data
+    # data = np.reshape(data, newshape=(-1, data_size, data_size)) if len(data.shape) != 3 else data
     assert not (np.isnan(data)).any()
     return data
 
@@ -45,7 +46,7 @@ class LoadDataAndLabels(Dataset):
         
         if self.cache:
             self.cache_data()
-        self.check_max_min_deg()
+        # self.check_max_min_deg()
     
     def check_max_min_deg(self):
         if self.rank in [-1, 0]:
@@ -63,10 +64,10 @@ class LoadDataAndLabels(Dataset):
             assert (label >= 0).all(), "negative labels: %s" % label_path
             assert (label[:, 1:] <= 1).all(), "non-normalized or out of bounds coordinate labels: %s" % label_path
             
-            max_deg = max(max_deg, np.max(label[:, 6] * 90 + 90 * label[:, 5]))
-            min_deg = min(min_deg, np.min(label[:, 6] * 90 + 90 * label[:, 5]))
-            max_deg_idx = max(max_deg_idx, np.max(label[:, 6] * 90 + 90 * label[:, 5]) // self.deg_step)
-            min_deg_idx = min(min_deg_idx, np.min(label[:, 6] * 90 + 90 * label[:, 5]) // self.deg_step)
+            max_deg = max(max_deg, np.max(label[:, 6]))
+            min_deg = min(min_deg, np.min(label[:, 6]))
+            max_deg_idx = max(max_deg_idx, np.max(label[:, 6]) // self.deg_step)
+            min_deg_idx = min(min_deg_idx, np.min(label[:, 6]) // self.deg_step)
         
         print('Max degree: ', max_deg)
         print('Min degree: ', min_deg)
@@ -74,6 +75,8 @@ class LoadDataAndLabels(Dataset):
         print('Min degree index: ', min_deg_idx)
         self.max_deg = max_deg
         self.min_deg = min_deg
+        self.max_deg_idx = max_deg_idx
+        self.min_deg_idx = min_deg_idx
         
     def cache_data(self):
         print('Caching data...')
@@ -118,14 +121,24 @@ class LoadDataAndLabels(Dataset):
             
             data = read_data_pickle(data_path, self.data_size)
         
+        # labels_out = {
+        #     "image_id": torch.as_tensor(index),
+        #     "orig_size": torch.as_tensor([self.data_size, self.data_size]),
+        #     "size": torch.as_tensor([self.data_size, self.data_size]),
+        #     "labels": torch.as_tensor(label[:, 0]).long(),
+        #     "boxes": torch.as_tensor(label[:, 1:5]),
+        #     "quadrant": torch.as_tensor(label[:, 5]).long(),
+        #     "directions": torch.as_tensor((label[:, 6] * 90 + 90 * label[:, 5]) // self.deg_step).long(),
+        # }
+        
         labels_out = {
             "image_id": torch.as_tensor(index),
             "orig_size": torch.as_tensor([self.data_size, self.data_size]),
             "size": torch.as_tensor([self.data_size, self.data_size]),
-            "labels": torch.as_tensor(label[:, 0]).long(),
+            "ba": torch.as_tensor(label[:, 0] // self.deg_step).long(),
             "boxes": torch.as_tensor(label[:, 1:5]),
-            "quadrant": torch.as_tensor(label[:, 5]).long(),
-            "directions": torch.as_tensor((label[:, 6] * 90 + 90 * label[:, 5]) // self.deg_step).long(),
+            "az": torch.as_tensor(label[:, 5]),
+            "el": torch.as_tensor(label[:, 6]),
         }
         
         return data, labels_out

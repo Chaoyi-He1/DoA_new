@@ -1,7 +1,7 @@
 # backbone
 in_type: '1d'
 data_size: 512
-in_channels: 12
+in_channels: 4
 drop_path: 0.2
 Encoder_attention: True
 
@@ -17,7 +17,7 @@ normalize_before: True
 # detection parameters
 num_classes: 3
 deg_step: 5.0
-num_queries: 180
+num_queries: 1
 
 # matcher parameters
 set_cost_class: 0.0
@@ -26,6 +26,10 @@ set_cost_giou: 0.0
 set_cost_quadrant: 0.0
 set_cost_direction: 1.0
 
+set_cost_ba: 1.0
+set_cost_az: 1.0
+set_cost_el: 1.0
+
 # loss parameters
 ce_loss_coef: 0.0
 bbox_loss_coef: 0.0
@@ -33,3 +37,9 @@ giou_loss_coef: 0.0
 eos_coef: 1.0
 quadrant_loss_coef: 0.0
 direction_loss_coef: 1.0
+
+ba_loss_coef: 1.0
+az_loss_coef: 1.0
+az_ms_loss_coef: 1.0
+el_loss_coef: 1.0
+el_ms_loss_coef: 1.0

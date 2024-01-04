@@ -337,5 +337,58 @@ class backbone(nn.Module):
             return output
 
 
+class CNN_test(nn.Module):
+    def __init__(self, in_type: str = "1d", cfg: dict = None) -> None:
+        super().__init__()
+        self.in_type = in_type
+        
+        self.AutoEncoder_cfg = {
+            "in_dim": (cfg["data_size"], cfg["data_size"]),
+            "in_channel": cfg["in_channels"],
+            "drop_path": cfg["drop_path"],
+            "with_atten": cfg["Encoder_attention"],
+        } if in_type == "2d" else {
+            "in_dim": cfg["data_size"],
+            "in_channel": cfg["in_channels"],
+            "drop_path": cfg["drop_path"],
+            "with_atten": cfg["Encoder_attention"],
+        }
+        
+        self.encoder = Conv2d_AutoEncoder(**self.AutoEncoder_cfg) \
+            if in_type == "2d" else \
+                Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
+                
+        self.embed_dim = self.encoder.channel
+        num_deg = int(180 // cfg["deg_step"]) + 1
+        self.sqz = nn.Conv1d(self.embed_dim, 1, kernel_size=1)
+        self.cls_head = nn.Linear(cfg["data_size"], num_deg) \
+            if in_type == "1d" else \
+                nn.Linear(256, num_deg)
+    
+    def forward(self, inputs: Tensor) -> Tensor:
+        # inputs: [B, channel, L, in_dim],
+        #         B is the batch size
+        #         L is the number of frames in each input data matrix, default is 512
+        #         channel is the number of channels in each input data matrix,
+        #             default is 12, which means 4 receivers antenna's T-F data (Amp, Real, Imag)
+        #         in_dim is the number of frequency bins in each input data matrix, default is 512
+        
+        if self.in_type == "2d":
+            output =  self.encoder(inputs)
+        elif self.in_type == "1d":
+            b = inputs.shape[0]
+            device = inputs.device
+            output = torch.stack([self.encoder(inputs[i, ...].permute(1, 0, 2).contiguous()) 
+                                  for i in range(b)]).to(device)
+        output = output.permute(0, 2, 1).contiguous()
+        output = self.sqz(output).squeeze()
+        output = self.cls_head(output)
+        return output
+        
+        
 def build_backbone(cfg: dict = None) -> nn.Module:
-    return backbone(cfg["in_type"], cfg)        
+    return backbone(cfg["in_type"], cfg)    
+
+
+def build_CNN_model(cfg: dict = None) -> nn.Module:
+    return CNN_test(cfg["in_type"], cfg)    

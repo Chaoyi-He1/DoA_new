@@ -112,9 +112,120 @@ class HungarianMatcher(nn.Module):
         return [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
 
+class HungarianMatcher_azel(nn.Module):
+    """This class computes an assignment between the targets and the predictions of the network
+
+    For efficiency reasons, the targets don't include the no_object. Because of this, in general,
+    there are more predictions than targets. In this case, we do a 1-to-1 matching of the best predictions,
+    while the others are un-matched (and thus treated as non-objects).
+    """
+
+    def __init__(self, cost_ba: float = 1, 
+                 cost_bbox: float = 1, 
+                 cost_giou: float = 1, 
+                 cost_az: float = 1,
+                 cost_el: float = 2):
+        """Creates the matcher
+
+        Params:
+            cost_class: This is the relative weight of the classification error in the matching cost
+            cost_bbox: This is the relative weight of the L1 error of the bounding box coordinates in the matching cost
+            cost_giou: This is the relative weight of the giou loss of the bounding box in the matching cost
+            cost_direction: This is the relative weight of the angle loss in the matching cost
+        """
+        super().__init__()
+        self.cost_ba = cost_ba
+        self.cost_bbox = cost_bbox
+        self.cost_giou = cost_giou
+        self.cost_az = cost_az
+        self.cost_el = cost_el
+        assert cost_ba != 0 or cost_bbox != 0 or cost_giou != 0 or cost_az != 0 or cost_el != 0, "all costs cant be 0"
+
+    @torch.no_grad()
+    def forward(self, outputs, targets):
+        """ Performs the matching
+
+        Params:
+            outputs: This is a dict that contains at least these entries:
+                 "pred_logits": Tensor of dim [batch_size, num_queries, num_classes] with the classification logits
+                 "pred_boxes": Tensor of dim [batch_size, num_queries, 4] with the predicted box coordinates
+                 "pred_directions": Tensor of dim [batch_size, num_queries, 2] with the predicted angle
+
+            targets: This is a list of targets (len(targets) = batch_size), where each target is a dict containing:
+                 "labels": Tensor of dim [num_target_boxes] (where num_target_boxes is the number of ground-truth
+                           objects in the target) containing the class labels
+                 "boxes": Tensor of dim [num_target_boxes, 4] containing the target box coordinates
+                 "directions": Tensor of dim [num_target_boxes, 2] containing the target angle
+
+        Returns:
+            A list of size batch_size, containing tuples of (index_i, index_j) where:
+                - index_i is the indices of the selected predictions (in order)
+                - index_j is the indices of the corresponding selected targets (in order)
+            For each batch element, it holds:
+                len(index_i) = len(index_j) = min(num_queries, num_target_boxes)
+        """
+        bs, num_queries = outputs["pred_ba"].shape[:2]
+
+        # We flatten to compute the cost matrices in a batch
+        out_ba = outputs["pred_ba"].flatten(0, 1).softmax(-1)  # [batch_size * num_queries, num_classes]
+        out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
+        out_az = outputs["pred_az"].flatten(0, 1)  # [batch_size * num_queries, 1]
+        out_el = outputs["pred_el"].flatten(0, 1)  # [batch_size * num_queries, 1]
+
+        # Also concat the target labels and boxes
+        tgt_ba = torch.cat([v["ba"] for v in targets])
+        tgt_bbox = torch.cat([v["boxes"] for v in targets])
+        tgt_az = torch.cat([v["az"] for v in targets])
+        tgt_el = torch.cat([v["el"] for v in targets])
+
+        # Compute the classification cost. Contrary to the loss, we don't use the NLL,
+        # but approximate it in 1 - proba[target class].
+
+        # The 1 is a constant that doesn't change the matching, it can be ommitted.
+        cost_ba = -out_ba[:, tgt_ba]
+
+        # Compute the L1 cost between boxes
+        cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
+
+        # Compute the giou cost betwen boxes
+        boxes1 = box_cxcywh_to_xyxy(out_bbox)
+        assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
+        boxes2 = box_cxcywh_to_xyxy(tgt_bbox)
+        assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
+        cost_giou = -generalized_box_iou(box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox))
+
+        # Compute the quadrant cost. Contrary to the loss, we don't use the NLL,
+        # but approximate it in proba[predict quadrant]- proba[target quadrant].
+        cost_az = torch.cdist(out_az, tgt_az, p=1)
+        
+        # Compute the L1 cost between directions
+        cost_el = torch.cdist(out_el, tgt_el, p=1)
+        # cost_direction = torch.cdist(out_direction, tgt_direction, p=1)
+
+        # Final cost matrix
+        C = self.cost_ba * cost_ba + \
+            self.cost_bbox * cost_bbox + self.cost_giou * cost_giou + \
+            self.cost_az * cost_az + \
+            self.cost_el * cost_el
+        C = C.view(bs, num_queries, -1).cpu()
+
+        sizes = [len(v["boxes"]) for v in targets]
+        indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]
+
+        return [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
+
+
 def build_matcher(cfg: dict = None):
     return HungarianMatcher(cost_class=cfg["set_cost_class"], 
                             cost_bbox=cfg["set_cost_bbox"], 
                             cost_giou=cfg["set_cost_giou"], 
                             cost_quadrant=cfg["set_cost_quadrant"],
                             cost_direction=cfg["set_cost_direction"])
+
+def build_matcher_azel(cfg: dict = None):
+    return HungarianMatcher_azel(cost_ba=cfg["set_cost_ba"], 
+                                 cost_bbox=cfg["set_cost_bbox"], 
+                                 cost_giou=cfg["set_cost_giou"], 
+                                 cost_az=cfg["set_cost_az"],
+                                 cost_el=cfg["set_cost_el"])
+    

@@ -5,8 +5,8 @@ from torch import nn
 from util import box_ops
 from util.misc import (get_world_size, is_dist_avail_and_initialized)
 
-from .backbone import build_backbone
-from .matcher import build_matcher
+from .backbone import build_backbone, build_CNN_model
+from .matcher import build_matcher, build_matcher_azel
 from .transformer import build_transformer
 from .positional_embedding import build_position_encoding
 
@@ -122,6 +122,29 @@ class SetCriterion(nn.Module):
             # TODO this should probably be a separate loss, not hacked in this one here
             losses['class_error'] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
         return losses
+    
+    def loss_ba(self, outputs, targets, indices, num_boxes, log=True):
+        """
+        Classification loss (NLL)
+        targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
+        """
+        assert 'pred_ba' in outputs
+        src_logits = outputs['pred_ba']
+
+        idx = self._get_src_permutation_idx(indices)
+        target_ba_o = torch.cat([t["ba"][J] for t, (_, J) in zip(targets, indices)])
+        target_ba = torch.full(src_logits.shape[:2], self.num_deg,
+                                    dtype=torch.int64, device=src_logits.device)
+        target_ba[idx] = target_ba_o
+
+        loss_ba = F.cross_entropy(src_logits.transpose(1, 2).contiguous(), 
+                                  target_ba, self.empty_weight.to(src_logits.device))
+        losses = {'loss_ba': loss_ba}
+
+        if log:
+            # TODO this should probably be a separate loss, not hacked in this one here
+            losses['ba_error'] = 100 - accuracy(src_logits[idx], target_ba_o)[0]
+        return losses
 
     @torch.no_grad()
     def loss_cardinality(self, outputs, targets, indices, num_boxes):
@@ -216,6 +239,42 @@ class SetCriterion(nn.Module):
             # TODO this should probably be a separate loss, not hacked in this one here
             losses['quadrant_error'] = 100 - accuracy(src_quadrant[idx], target_quadrant_o)[0]
         return losses
+    
+    def loss_az(self, outputs, targets, indices, num_boxes):
+        """Compute the losses related to the bounding boxes, the L1 regression loss and the GIoU loss
+           targets dicts must contain the key "boxes" containing a tensor of dim [nb_target_boxes, 4]
+           The target boxes are expected in format (center_x, center_y, w, h), normalized by the image size.
+        """
+        assert 'pred_az' in outputs
+        idx = self._get_src_permutation_idx(indices)
+        src_az = outputs['pred_az'][idx]
+        target_az = torch.cat([t['az'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+
+        loss_az = F.l1_loss(src_az, target_az, reduction='none')
+        loss_az_mse = F.mse_loss(src_az, target_az, reduction='none')
+
+        losses = {'loss_az': loss_az.sum() / num_boxes,
+                  'loss_az_mse': loss_az_mse.sum() / num_boxes}
+
+        return losses
+    
+    def loss_el(self, outputs, targets, indices, num_boxes):
+        """Compute the losses related to the bounding boxes, the L1 regression loss and the GIoU loss
+           targets dicts must contain the key "boxes" containing a tensor of dim [nb_target_boxes, 4]
+           The target boxes are expected in format (center_x, center_y, w, h), normalized by the image size.
+        """
+        assert 'pred_el' in outputs
+        idx = self._get_src_permutation_idx(indices)
+        src_el = outputs['pred_el'][idx]
+        target_el = torch.cat([t['el'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+
+        loss_el = F.l1_loss(src_el, target_el, reduction='none')
+        loss_el_mse = F.mse_loss(src_el, target_el, reduction='none')
+
+        losses = {'loss_az': loss_el.sum() / num_boxes,
+                  'loss_az_mse': loss_el_mse.sum() / num_boxes}
+
+        return losses
 
     def forward(self, outputs, targets):
         """ This performs the loss computation.
@@ -241,6 +300,26 @@ class SetCriterion(nn.Module):
         for loss in self.losses:
             losses.update(self.get_loss(loss, outputs, targets, indices, num_boxes))
         return losses
+
+
+class CNN_test_Loss(nn.Module):
+    '''
+        This is a loss function for CNN only model with fixed target number
+        Output of CNN will be [batch, num_deg], and target will be a list of dict
+        with key 'directions' and value [num_deg, ] for each dict in the target list
+    '''
+    def __init__(self, num_deg, weight_dict):
+        super().__init__()
+        self.num_deg = num_deg
+        self.weight_dict = weight_dict
+    
+    def forward(self, outputs, targets):
+        tgt_directions = torch.cat([t['directions'] for t in targets], dim=0)
+        loss = {
+            'loss_directions': F.cross_entropy(outputs, tgt_directions)
+        }
+        loss["direction_error"] = 100 - accuracy(outputs, tgt_directions)[0]
+        return loss
 
 
 class PostProcess(nn.Module):
@@ -314,6 +393,43 @@ class Detection(nn.Module):
         return out
 
 
+class Detection_azel(nn.Module):
+    def __init__(self, backbone, transformer, num_classes, num_queries, num_deg) -> None:
+        super().__init__()
+        self.num_queries = num_queries
+        self.backbone = backbone
+        self.transformer = transformer
+        hidden_dim = transformer.d_model
+        self.ba_embed = MLP(hidden_dim, hidden_dim, num_deg + 1, 4)
+        self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 1)
+        self.az_embed = MLP(hidden_dim, hidden_dim * 3, 1, 4)
+        self.el_embed = MLP(hidden_dim, hidden_dim * 3, 1, 4)
+        self.query_embed = nn.Embedding(num_queries, hidden_dim)
+        self.pos_embed = build_position_encoding('learned', hidden_dim)
+    
+    def forward(self, inputs):
+        features = self.backbone(inputs)
+        pos = self.pos_embed(features)
+        hs = self.transformer(tgt=self.query_embed.weight.unsqueeze(0).repeat(inputs.shape[0], 1, 1), 
+                              memory=features, 
+                              pos=pos)
+
+        outputs_ba = self.ba_embed(hs)
+        outputs_coord = self.bbox_embed(hs)
+        # max_coord = outputs_coord.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
+        outputs_coord = outputs_coord.sigmoid()
+        outputs_az = self.az_embed(hs)
+        outputs_el = self.el_embed(hs)
+        # max_direction = outputs_direction.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
+        # outputs_direction = (outputs_direction / max_direction).sigmoid()
+        
+        out = {'pred_ba': outputs_ba, 
+               'pred_boxes': outputs_coord, 
+               'pred_az': outputs_az, 
+               'pred_el': outputs_el}
+        return out
+    
+    
 def build(hyp):
     backbone = build_backbone(hyp)
     transformer = build_transformer(hyp)
@@ -331,6 +447,43 @@ def build(hyp):
                    'loss_directions': hyp['direction_loss_coef'],
                    }
     losses = ['labels', 'boxes', 'quadrant', 'directions']   # 
+    
+    criterion = SetCriterion(hyp['num_classes'],
+                             int(180 // hyp['deg_step'] + 1), 
+                             matcher=matcher,
+                             weight_dict=weight_dict,
+                             eos_coef=hyp['eos_coef'],
+                             losses=losses)
+    coco_postprocessors = {'bbox': PostProcess()}
+    return detection, criterion, coco_postprocessors
+
+
+def build_CNN_test(hyp):
+    weight_dict = {'loss_directions': hyp['direction_loss_coef']}
+    criterion = CNN_test_Loss(int(180 // hyp['deg_step'] + 1), weight_dict)
+    model = build_CNN_model(hyp)
+    return model, criterion
+
+
+def build_azel_test(hyp):
+    backbone = build_backbone(hyp)
+    transformer = build_transformer(hyp)
+    detection = Detection_azel(backbone, 
+                               transformer, 
+                               hyp['num_classes'], 
+                               hyp['num_queries'],
+                               int(180 // hyp['deg_step'] + 1))
+    matcher = build_matcher_azel(hyp)
+    
+    weight_dict = {'loss_ba': hyp['ba_loss_coef'], 
+                   'loss_bbox': hyp['bbox_loss_coef'], 
+                   'loss_giou': hyp['giou_loss_coef'], 
+                   'loss_az': hyp['az_loss_coef'], 
+                   'loss_az_mse': hyp['az_mse_loss_coef'],
+                   'loss_el': hyp['el_loss_coef'],
+                   'loss_el_mse': hyp['el_mse_loss_coef'],
+                   }
+    losses = ['ba', 'boxes', 'az', 'el']   # 
     
     criterion = SetCriterion(hyp['num_classes'],
                              int(180 // hyp['deg_step'] + 1), 

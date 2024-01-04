@@ -56,8 +56,8 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
     # dataset parameters
-    parser.add_argument('--train-path', default='/data/share/arya/DOA/single/train/', help='train dataset path')
-    parser.add_argument('--val-path', default='/data/share/arya/DOA/single/val/', help='val dataset path')
+    parser.add_argument('--train-path', default='/data/chaoyi_he/Matlab/Radiation/', help='train dataset path')
+    parser.add_argument('--val-path', default='/data/chaoyi_he/Matlab/Radiation/', help='val dataset path')
     parser.add_argument('--cache-data', default=False, type=bool, help='cache data for faster training')
     parser.add_argument('--output-dir', default='weights/', help='path where to save, empty for no saving')
 
@@ -133,11 +133,9 @@ def main(args):
     data_loader_val = torch.utils.data.DataLoader(dataset_val, batch_sampler=batch_sampler_val,
                                                   collate_fn=dataset_val.collate_fn, num_workers=nw)
     
-    base_ds = get_coco_api_from_dataset(dataset_val)
-    
     # model
     print("Model generating...")
-    model, criterion, postprocessors = build(cfg)
+    model, criterion = build_CNN_test(cfg)
     model.to(device)
     
     # if utils.is_main_process() and tb_writer:
@@ -219,10 +217,9 @@ def main(args):
         print('Using %g dataloader workers' % nw)
     
     if args.eval:
-        test_stats, coco_evaluator = evaluate(model, criterion, postprocessors,
-                                              data_loader_val, base_ds, device, args.output_dir)
-        if args.output_dir:
-            utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
+        test_stats = evaluate_cnn_test(model=model, data_loader=data_loader_val, 
+                                       criterion=criterion, device=device, 
+                                       scaler=scaler)
         return
 
     print("Start training...")
@@ -238,10 +235,9 @@ def main(args):
                                       scaler=scaler)
         scheduler.step()
         
-        test_stats, coco_evaluator = evaluate(model=model, data_loader=data_loader_val, 
-                                              criterion=criterion, device=device, 
-                                              postprocessors=postprocessors, 
-                                              base_ds=base_ds, scaler=scaler)
+        test_stats = evaluate_cnn_test(model=model, data_loader=data_loader_val, 
+                                       criterion=criterion, device=device, 
+                                       scaler=scaler)
         
         # write results
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
