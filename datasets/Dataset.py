@@ -116,8 +116,8 @@ class LoadDataAndLabels(Dataset):
             with open(label_path, 'r') as f:
                 label = np.array([x.split() for x in f.read().splitlines()], dtype=np.float32)
             assert label.shape[1] == 7, "> 5 label columns: %s" % label_path
-            assert (label >= 0).all(), "negative labels: %s" % label_path
-            assert (label[:, 1:] <= 1).all(), "non-normalized or out of bounds coordinate labels: %s" % label_path
+            # assert (label >= 0).all(), "negative labels: %s" % label_path
+            # assert (label[:, 1:] <= 1).all(), "non-normalized or out of bounds coordinate labels: %s" % label_path
             
             data = read_data_pickle(data_path, self.data_size)
         
@@ -135,10 +135,10 @@ class LoadDataAndLabels(Dataset):
             "image_id": torch.as_tensor(index),
             "orig_size": torch.as_tensor([self.data_size, self.data_size]),
             "size": torch.as_tensor([self.data_size, self.data_size]),
-            "ba": torch.as_tensor(label[:, 0] // self.deg_step).long(),
+            "ba": torch.as_tensor((label[:, 0] + 90) // self.deg_step).long(),
             "boxes": torch.as_tensor(label[:, 1:5]),
-            "az": torch.as_tensor(label[:, 5]),
-            "el": torch.as_tensor(label[:, 6]),
+            "az": torch.as_tensor(label[:, 5]).view(-1, 1),
+            "el": torch.as_tensor(label[:, 6]).view(-1, 1),
         }
         
         return data, labels_out

@@ -96,6 +96,9 @@ class SetCriterion(nn.Module):
             'boxes': self.loss_boxes,
             'quadrant': self.loss_quadrant,
             'directions': self.loss_directions,
+            'ba': self.loss_ba,
+            'az': self.loss_az,
+            'el': self.loss_el,
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
@@ -138,7 +141,7 @@ class SetCriterion(nn.Module):
         target_ba[idx] = target_ba_o
 
         loss_ba = F.cross_entropy(src_logits.transpose(1, 2).contiguous(), 
-                                  target_ba, self.empty_weight.to(src_logits.device))
+                                  target_ba, self.direction_weight.to(src_logits.device))
         losses = {'loss_ba': loss_ba}
 
         if log:
@@ -271,8 +274,8 @@ class SetCriterion(nn.Module):
         loss_el = F.l1_loss(src_el, target_el, reduction='none')
         loss_el_mse = F.mse_loss(src_el, target_el, reduction='none')
 
-        losses = {'loss_az': loss_el.sum() / num_boxes,
-                  'loss_az_mse': loss_el_mse.sum() / num_boxes}
+        losses = {'loss_el': loss_el.sum() / num_boxes,
+                  'loss_el_mse': loss_el_mse.sum() / num_boxes}
 
         return losses
 
@@ -289,7 +292,7 @@ class SetCriterion(nn.Module):
         indices = self.matcher(outputs_without_aux, targets)
 
         # Compute the average number of target boxes accross all nodes, for normalization purposes
-        num_boxes = sum(len(t["labels"]) for t in targets)
+        num_boxes = sum(len(t["boxes"]) for t in targets)
         num_boxes = torch.as_tensor([num_boxes], dtype=torch.float, device=next(iter(outputs.values())).device)
         if is_dist_avail_and_initialized():
             torch.distributed.all_reduce(num_boxes)
@@ -426,7 +429,7 @@ class Detection_azel(nn.Module):
         out = {'pred_ba': outputs_ba, 
                'pred_boxes': outputs_coord, 
                'pred_az': outputs_az, 
-               'pred_el': outputs_el}
+               'pred_el': outputs_el,}
         return out
     
     
@@ -476,8 +479,8 @@ def build_azel_test(hyp):
     matcher = build_matcher_azel(hyp)
     
     weight_dict = {'loss_ba': hyp['ba_loss_coef'], 
-                   'loss_bbox': hyp['bbox_loss_coef'], 
-                   'loss_giou': hyp['giou_loss_coef'], 
+                   'loss_bbox': hyp['bbox_loss_coef'],
+                   'loss_giou': hyp['giou_loss_coef'],
                    'loss_az': hyp['az_loss_coef'], 
                    'loss_az_mse': hyp['az_mse_loss_coef'],
                    'loss_el': hyp['el_loss_coef'],

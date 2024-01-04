@@ -56,8 +56,8 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
     # dataset parameters
-    parser.add_argument('--train-path', default='/data/share/arya/DOA/single/train/', help='train dataset path')
-    parser.add_argument('--val-path', default='/data/share/arya/DOA/single/val/', help='val dataset path')
+    parser.add_argument('--train-path', default='/data2/chaoyi/DOA/sim/train/', help='train dataset path')
+    parser.add_argument('--val-path', default='/data2/chaoyi/DOA/sim/train/', help='val dataset path')
     parser.add_argument('--cache-data', default=False, type=bool, help='cache data for faster training')
     parser.add_argument('--output-dir', default='weights/', help='path where to save, empty for no saving')
 
@@ -137,7 +137,7 @@ def main(args):
     
     # model
     print("Model generating...")
-    model, criterion, postprocessors = build(cfg)
+    model, criterion, postprocessors = build_azel_test(cfg)
     model.to(device)
     
     # if utils.is_main_process() and tb_writer:

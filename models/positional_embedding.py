@@ -49,17 +49,17 @@ class PositionEmbeddingLearned(nn.Module):
     """
     def __init__(self, num_pos_feats=256):
         super().__init__()
-        self.embed = nn.Embedding(100, num_pos_feats)
+        self.embed = nn.Embedding(512, num_pos_feats)
+        self.num_pos_feats = num_pos_feats
         self.reset_parameters()
 
     def reset_parameters(self):
         nn.init.uniform_(self.embed.weight)
-        nn.init.uniform_(self.col_embed.weight)
 
     def forward(self, x):
         l, dim = x.shape[-2:]
-        # assert dim == self.num_pos_feats and l <= 100, \
-        #     f"the size of the pos embedding is not correct, {l} vs {100}"
+        assert dim == self.num_pos_feats and l <= 512, \
+            f"the size of the pos embedding is not correct, {l} vs {100}"
         i = torch.arange(l, device=x.device)
         embeded = self.embed(i)
         pos = embeded.unsqueeze(0).repeat(x.shape[0], 1, 1)

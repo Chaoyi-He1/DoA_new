@@ -1,7 +1,7 @@
 # backbone
 in_type: '1d'
 data_size: 512
-in_channels: 4
+in_channels: 20
 drop_path: 0.2
 Encoder_attention: True
 
@@ -17,7 +17,7 @@ normalize_before: True
 # detection parameters
 num_classes: 3
 deg_step: 5.0
-num_queries: 1
+num_queries: 10
 
 # matcher parameters
 set_cost_class: 0.0
@@ -40,6 +40,6 @@ direction_loss_coef: 1.0
 
 ba_loss_coef: 1.0
 az_loss_coef: 1.0
-az_ms_loss_coef: 1.0
+az_mse_loss_coef: 1.0
 el_loss_coef: 1.0
-el_ms_loss_coef: 1.0
+el_mse_loss_coef: 1.0

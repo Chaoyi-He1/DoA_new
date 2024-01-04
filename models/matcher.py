@@ -121,8 +121,6 @@ class HungarianMatcher_azel(nn.Module):
     """
 
     def __init__(self, cost_ba: float = 1, 
-                 cost_bbox: float = 1, 
-                 cost_giou: float = 1, 
                  cost_az: float = 1,
                  cost_el: float = 2):
         """Creates the matcher
@@ -135,11 +133,9 @@ class HungarianMatcher_azel(nn.Module):
         """
         super().__init__()
         self.cost_ba = cost_ba
-        self.cost_bbox = cost_bbox
-        self.cost_giou = cost_giou
         self.cost_az = cost_az
         self.cost_el = cost_el
-        assert cost_ba != 0 or cost_bbox != 0 or cost_giou != 0 or cost_az != 0 or cost_el != 0, "all costs cant be 0"
+        assert cost_ba != 0 or cost_az != 0 or cost_el != 0, "all costs cant be 0"
 
     @torch.no_grad()
     def forward(self, outputs, targets):
@@ -168,13 +164,11 @@ class HungarianMatcher_azel(nn.Module):
 
         # We flatten to compute the cost matrices in a batch
         out_ba = outputs["pred_ba"].flatten(0, 1).softmax(-1)  # [batch_size * num_queries, num_classes]
-        out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
         out_az = outputs["pred_az"].flatten(0, 1)  # [batch_size * num_queries, 1]
         out_el = outputs["pred_el"].flatten(0, 1)  # [batch_size * num_queries, 1]
 
         # Also concat the target labels and boxes
         tgt_ba = torch.cat([v["ba"] for v in targets])
-        tgt_bbox = torch.cat([v["boxes"] for v in targets])
         tgt_az = torch.cat([v["az"] for v in targets])
         tgt_el = torch.cat([v["el"] for v in targets])
 
@@ -183,16 +177,6 @@ class HungarianMatcher_azel(nn.Module):
 
         # The 1 is a constant that doesn't change the matching, it can be ommitted.
         cost_ba = -out_ba[:, tgt_ba]
-
-        # Compute the L1 cost between boxes
-        cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
-
-        # Compute the giou cost betwen boxes
-        boxes1 = box_cxcywh_to_xyxy(out_bbox)
-        assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
-        boxes2 = box_cxcywh_to_xyxy(tgt_bbox)
-        assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
-        cost_giou = -generalized_box_iou(box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox))
 
         # Compute the quadrant cost. Contrary to the loss, we don't use the NLL,
         # but approximate it in proba[predict quadrant]- proba[target quadrant].
@@ -204,7 +188,6 @@ class HungarianMatcher_azel(nn.Module):
 
         # Final cost matrix
         C = self.cost_ba * cost_ba + \
-            self.cost_bbox * cost_bbox + self.cost_giou * cost_giou + \
             self.cost_az * cost_az + \
             self.cost_el * cost_el
         C = C.view(bs, num_queries, -1).cpu()
@@ -224,8 +207,6 @@ def build_matcher(cfg: dict = None):
 
 def build_matcher_azel(cfg: dict = None):
     return HungarianMatcher_azel(cost_ba=cfg["set_cost_ba"], 
-                                 cost_bbox=cfg["set_cost_bbox"], 
-                                 cost_giou=cfg["set_cost_giou"], 
                                  cost_az=cfg["set_cost_az"],
                                  cost_el=cfg["set_cost_el"])
     

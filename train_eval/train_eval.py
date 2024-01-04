@@ -96,7 +96,6 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module,
                                       for k, v in loss_dict_reduced.items()}
         metric_logger.update(loss=weighted_losses.item(),
                              **loss_dict_reduced_unscaled)
-        metric_logger.update(class_error=loss_dict['class_error'].item())
         
         # For coco evaluation
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
