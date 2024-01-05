@@ -98,20 +98,20 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module,
                              **loss_dict_reduced_unscaled)
         
         # For coco evaluation
-        orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
-        results = postprocessors['bbox'](outputs, orig_target_sizes)
-        res = {target['image_id'].item(): output for target, output in zip(targets, results)}
-        if coco_evaluator is not None:
-            coco_evaluator.update(res)
+        # orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
+        # results = postprocessors['bbox'](outputs, orig_target_sizes)
+        # res = {target['image_id'].item(): output for target, output in zip(targets, results)}
+        # if coco_evaluator is not None:
+        #     coco_evaluator.update(res)
     
     # Gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
-    coco_evaluator.synchronize_between_processes()
-    coco_evaluator.accumulate()
-    coco_evaluator.summarize()
+    # coco_evaluator.synchronize_between_processes()
+    # coco_evaluator.accumulate()
+    # coco_evaluator.summarize()
 
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}, coco_evaluator
+    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}   # , coco_evaluator
 
 
 @torch.no_grad()

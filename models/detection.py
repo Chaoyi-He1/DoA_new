@@ -404,7 +404,7 @@ class Detection_azel(nn.Module):
         self.transformer = transformer
         hidden_dim = transformer.d_model
         self.ba_embed = MLP(hidden_dim, hidden_dim, num_deg + 1, 4)
-        self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 1)
+        # self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 1)
         self.az_embed = MLP(hidden_dim, hidden_dim * 3, 1, 4)
         self.el_embed = MLP(hidden_dim, hidden_dim * 3, 1, 4)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
@@ -418,16 +418,16 @@ class Detection_azel(nn.Module):
                               pos=pos)
 
         outputs_ba = self.ba_embed(hs)
-        outputs_coord = self.bbox_embed(hs)
-        # max_coord = outputs_coord.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
-        outputs_coord = outputs_coord.sigmoid()
+        # outputs_coord = self.bbox_embed(hs)
+        # # max_coord = outputs_coord.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
+        # outputs_coord = outputs_coord.sigmoid()
         outputs_az = self.az_embed(hs)
         outputs_el = self.el_embed(hs)
         # max_direction = outputs_direction.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
         # outputs_direction = (outputs_direction / max_direction).sigmoid()
         
         out = {'pred_ba': outputs_ba, 
-               'pred_boxes': outputs_coord, 
+            #    'pred_boxes': outputs_coord, 
                'pred_az': outputs_az, 
                'pred_el': outputs_el,}
         return out
@@ -479,14 +479,14 @@ def build_azel_test(hyp):
     matcher = build_matcher_azel(hyp)
     
     weight_dict = {'loss_ba': hyp['ba_loss_coef'], 
-                   'loss_bbox': hyp['bbox_loss_coef'],
-                   'loss_giou': hyp['giou_loss_coef'],
+                #    'loss_bbox': hyp['bbox_loss_coef'],
+                #    'loss_giou': hyp['giou_loss_coef'],
                    'loss_az': hyp['az_loss_coef'], 
                    'loss_az_mse': hyp['az_mse_loss_coef'],
                    'loss_el': hyp['el_loss_coef'],
                    'loss_el_mse': hyp['el_mse_loss_coef'],
                    }
-    losses = ['ba', 'boxes', 'az', 'el']   # 
+    losses = ['ba', 'az', 'el']   # 'boxes', 
     
     criterion = SetCriterion(hyp['num_classes'],
                              int(180 // hyp['deg_step'] + 1), 

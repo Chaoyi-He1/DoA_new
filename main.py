@@ -238,10 +238,10 @@ def main(args):
                                       scaler=scaler)
         scheduler.step()
         
-        test_stats, coco_evaluator = evaluate(model=model, data_loader=data_loader_val, 
-                                              criterion=criterion, device=device, 
-                                              postprocessors=postprocessors, 
-                                              base_ds=base_ds, scaler=scaler)
+        test_stats = evaluate(model=model, data_loader=data_loader_val, 
+                              criterion=criterion, device=device, 
+                              postprocessors=postprocessors, 
+                              base_ds=base_ds, scaler=scaler)
         
         # write results
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
