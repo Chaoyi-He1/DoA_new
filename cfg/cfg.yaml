@@ -1,5 +1,5 @@
 # backbone
-in_type: '1d'
+in_type: '2d'
 data_size: 512
 in_channels: 20
 drop_path: 0.2
@@ -11,12 +11,12 @@ d_model: 512
 nhead: 8
 dim_feedforward: 1024
 dropout: 0.2
-activation: 'relu'
+activation: 'gelu'
 normalize_before: True
 
 # detection parameters
 num_classes: 3
-deg_step: 5.0
+deg_step: 20
 num_queries: 10
 
 # matcher parameters
