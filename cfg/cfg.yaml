@@ -16,7 +16,7 @@ normalize_before: True
 
 # detection parameters
 num_classes: 3
-deg_step: 20
+deg_step: 90
 num_queries: 10
 
 # matcher parameters
@@ -38,8 +38,8 @@ eos_coef: 0.1
 quadrant_loss_coef: 0.0
 direction_loss_coef: 1.0
 
-ba_loss_coef: 2.0
-az_loss_coef: 1.0
-az_mse_loss_coef: 0.1
-el_loss_coef: 1.0
-el_mse_loss_coef: 0.1
+ba_loss_coef: 1.0
+az_loss_coef: 2.0
+az_mse_loss_coef: 0.05
+el_loss_coef: 2.0
+el_mse_loss_coef: 0.05
