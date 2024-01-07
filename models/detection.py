@@ -40,7 +40,7 @@ class MLP(nn.Module):
 
     def forward(self, x):
         for i, layer in enumerate(self.layers):
-            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+            x = F.sigmoid(layer(x)) if i < self.num_layers - 1 else layer(x)
         return x
     
 

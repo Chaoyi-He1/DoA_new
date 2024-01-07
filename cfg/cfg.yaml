@@ -36,7 +36,7 @@ bbox_loss_coef: 0.0
 giou_loss_coef: 0.0
 eos_coef: 0.1
 quadrant_loss_coef: 0.0
-direction_loss_coef: 1.0
+direction_loss_coef: 1.0  
 
 ba_loss_coef: 1.0
 az_loss_coef: 2.0
