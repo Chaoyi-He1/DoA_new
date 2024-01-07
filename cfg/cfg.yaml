@@ -27,8 +27,8 @@ set_cost_quadrant: 0.0
 set_cost_direction: 1.0
 
 set_cost_ba: 1.0
-set_cost_az: 1.0
-set_cost_el: 1.0
+set_cost_az: 2.0
+set_cost_el: 2.0
 
 # loss parameters
 ce_loss_coef: 0.0
