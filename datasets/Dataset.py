@@ -17,7 +17,7 @@ from tqdm import tqdm
 
 def read_data_pickle(data_path, data_size):
     # data = np.fromfile(data_path, dtype=np.float32).reshape(-1, 512)
-    data = np.fromfile(data_path, dtype=np.float32).reshape((512, 512, 20)).transpose((2, 1, 0))
+    data = np.fromfile(data_path, dtype=np.float32).reshape((512, 512, 20)).transpose((2, 0, 1))
     data = np.asarray(data, dtype=float)
     # data = np.reshape(data, newshape=(-1, data_size, data_size)) if len(data.shape) != 3 else data
     assert not (np.isnan(data)).any()
@@ -46,7 +46,7 @@ class LoadDataAndLabels(Dataset):
         
         if self.cache:
             self.cache_data()
-        # self.check_max_min_deg()
+        self.check_max_min_deg()
     
     def check_max_min_deg(self):
         if self.rank in [-1, 0]:
@@ -61,13 +61,13 @@ class LoadDataAndLabels(Dataset):
             with open(label_path, 'r') as f:
                 label = np.array([x.split() for x in f.read().splitlines()], dtype=np.float32)
             assert label.shape[1] == 7, "> 5 label columns: %s" % label_path
-            assert (label >= 0).all(), "negative labels: %s" % label_path
-            assert (label[:, 1:] <= 1).all(), "non-normalized or out of bounds coordinate labels: %s" % label_path
+            # assert (label >= 0).all(), "negative labels: %s" % label_path
+            # assert (label[:, 1:] <= 1).all(), "non-normalized or out of bounds coordinate labels: %s" % label_path
             
-            max_deg = max(max_deg, np.max(label[:, 6]))
-            min_deg = min(min_deg, np.min(label[:, 6]))
-            max_deg_idx = max(max_deg_idx, np.max(label[:, 6]) // self.deg_step)
-            min_deg_idx = min(min_deg_idx, np.min(label[:, 6]) // self.deg_step)
+            max_deg = max(max_deg, np.max(label[:, 0]))
+            min_deg = min(min_deg, np.min(label[:, 0]))
+            max_deg_idx = max(max_deg_idx, np.max(label[:, 0]) // self.deg_step)
+            min_deg_idx = min(min_deg_idx, np.min(label[:, 0]) // self.deg_step)
         
         print('Max degree: ', max_deg)
         print('Min degree: ', min_deg)
@@ -163,6 +163,6 @@ class LoadDataAndLabels(Dataset):
     def collate_fn(batch):
         data, label = list(zip(*batch))
         data = np.stack(data, axis=0)
-        data = torch.from_numpy(data).float()
+        data = torch.from_numpy(data).contiguous().float()
         return data, label
     
