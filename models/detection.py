@@ -431,6 +431,45 @@ class Detection_azel(nn.Module):
                'pred_az': outputs_az, 
                'pred_el': outputs_el,}
         return out
+
+
+class Detection_azel_trans_only(nn.Module):
+    def __init__(self, transformer_encoder, transformer_decoder, 
+                 num_classes, num_queries, num_deg) -> None:
+        super().__init__()
+        self.num_queries = num_queries
+        self.transformer_encoder = transformer_encoder
+        self.transformer_decoder = transformer_decoder
+        hidden_dim = transformer_decoder.d_model
+        self.ba_embed = MLP(hidden_dim, hidden_dim, num_deg + 1, 4)
+        # self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 1)
+        self.az_embed = MLP(hidden_dim, hidden_dim * 3, 1, 4)
+        self.el_embed = MLP(hidden_dim, hidden_dim * 3, 1, 4)
+        self.query_embed = nn.Embedding(num_queries, hidden_dim)
+        self.pos_embed = build_position_encoding('learned', hidden_dim)
+    
+    def forward(self, inputs):
+        pos = self.pos_embed(inputs)
+        features = self.transformer_encoder(inputs, pos)
+        
+        hs = self.transformer_decoder(tgt=self.query_embed.weight.unsqueeze(0).repeat(inputs.shape[0], 1, 1), 
+                                      memory=features, 
+                                      pos=pos)
+
+        outputs_ba = self.ba_embed(hs)
+        # outputs_coord = self.bbox_embed(hs)
+        # # max_coord = outputs_coord.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
+        # outputs_coord = outputs_coord.sigmoid()
+        outputs_az = self.az_embed(hs)
+        outputs_el = self.el_embed(hs)
+        # max_direction = outputs_direction.max(dim=-1)[0].max(dim=-1)[0].unsqueeze(-1).unsqueeze(-1)
+        # outputs_direction = (outputs_direction / max_direction).sigmoid()
+        
+        out = {'pred_ba': outputs_ba, 
+            #    'pred_boxes': outputs_coord, 
+               'pred_az': outputs_az, 
+               'pred_el': outputs_el,}
+        return out
     
     
 def build(hyp):

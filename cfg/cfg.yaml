@@ -6,6 +6,7 @@ drop_path: 0.2
 Encoder_attention: True
 
 # Transformer
+num_encoder_layers: 8
 num_decoder_layers: 8
 d_model: 512
 nhead: 8
@@ -38,7 +39,7 @@ eos_coef: 2.0
 quadrant_loss_coef: 0.0
 direction_loss_coef: 1.0  
 
-ba_loss_coef: 1.0
+ba_loss_coef: 4.0
 az_loss_coef: 2.0
 az_mse_loss_coef: 0.05
 el_loss_coef: 2.0

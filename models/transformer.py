@@ -393,4 +393,18 @@ def build_transformer(cfg: dict):
         "normalize_before": cfg["normalize_before"],
     }
     return Transformer_Decoder(**decoder_params)
-    
+ 
+ 
+def build_transformer_encoder(cfg: dict):
+    encoder_params = {
+        "num_layers": cfg["num_encoder_layers"],
+        "d_model": cfg["d_model"],
+        "nhead": cfg["nhead"],
+        "dim_feedforward": cfg["dim_feedforward"],
+        "dropout": cfg["dropout"],
+        "drop_path": cfg["drop_path"],
+        "activation": cfg["activation"],
+        "normalize_before": cfg["normalize_before"],
+    }
+    return Transformer_Encoder(**encoder_params)
+   
