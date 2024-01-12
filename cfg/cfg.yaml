@@ -17,7 +17,7 @@ normalize_before: True
 
 # detection parameters
 num_classes: 3
-deg_step: 5
+deg_step: 10
 num_queries: 10
 
 # matcher parameters

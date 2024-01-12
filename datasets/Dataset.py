@@ -17,7 +17,7 @@ from tqdm import tqdm
 
 def read_data_pickle(data_path, data_size):
     # data = np.fromfile(data_path, dtype=np.float32).reshape(-1, 512)
-    data = np.fromfile(data_path, dtype=np.float32).reshape((512, 512, 20)).transpose((2, 0, 1))
+    data = np.fromfile(data_path, dtype=np.float32).reshape((512, 20)).transpose((1, 0))
     data = np.asarray(data, dtype=float)
     # data = np.reshape(data, newshape=(-1, data_size, data_size)) if len(data.shape) != 3 else data
     assert not (np.isnan(data)).any()

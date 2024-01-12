@@ -137,7 +137,7 @@ def main(args):
     
     # model
     print("Model generating...")
-    model, criterion, postprocessors = build_azel_test(cfg)
+    model, criterion, postprocessors = build_azel_transformer_only(cfg)
     model.to(device)
     
     # if utils.is_main_process() and tb_writer:

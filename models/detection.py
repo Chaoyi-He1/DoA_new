@@ -7,7 +7,7 @@ from util.misc import (get_world_size, is_dist_avail_and_initialized)
 
 from .backbone import build_backbone, build_CNN_model
 from .matcher import build_matcher, build_matcher_azel
-from .transformer import build_transformer
+from .transformer import *
 from .positional_embedding import build_position_encoding
 
 
@@ -450,7 +450,7 @@ class Detection_azel_trans_only(nn.Module):
     
     def forward(self, inputs):
         pos = self.pos_embed(inputs)
-        features = self.transformer_encoder(inputs, pos)
+        features = self.transformer_encoder(inputs, pos=pos)
         
         hs = self.transformer_decoder(tgt=self.query_embed.weight.unsqueeze(0).repeat(inputs.shape[0], 1, 1), 
                                       memory=features, 
@@ -515,6 +515,36 @@ def build_azel_test(hyp):
                                hyp['num_classes'], 
                                hyp['num_queries'],
                                int(180 // hyp['deg_step'] + 1))
+    matcher = build_matcher_azel(hyp)
+    
+    weight_dict = {'loss_ba': hyp['ba_loss_coef'], 
+                #    'loss_bbox': hyp['bbox_loss_coef'],
+                #    'loss_giou': hyp['giou_loss_coef'],
+                   'loss_az': hyp['az_loss_coef'], 
+                   'loss_az_mse': hyp['az_mse_loss_coef'],
+                   'loss_el': hyp['el_loss_coef'],
+                   'loss_el_mse': hyp['el_mse_loss_coef'],
+                   }
+    losses = ['ba', 'az', 'el']   # 'boxes', 
+    
+    criterion = SetCriterion(hyp['num_classes'],
+                             int(180 // hyp['deg_step'] + 1), 
+                             matcher=matcher,
+                             weight_dict=weight_dict,
+                             eos_coef=hyp['eos_coef'],
+                             losses=losses)
+    coco_postprocessors = {'bbox': PostProcess()}
+    return detection, criterion, coco_postprocessors
+
+
+def build_azel_transformer_only(hyp):
+    encoder = build_transformer_encoder(hyp)
+    decoder = build_transformer(hyp)
+    detection = Detection_azel_trans_only(encoder, 
+                                          decoder, 
+                                          hyp['num_classes'], 
+                                          hyp['num_queries'],
+                                          int(180 // hyp['deg_step'] + 1))
     matcher = build_matcher_azel(hyp)
     
     weight_dict = {'loss_ba': hyp['ba_loss_coef'], 
