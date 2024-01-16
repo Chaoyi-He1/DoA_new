@@ -171,7 +171,7 @@ def main(args):
         start_epoch = ckpt["epoch"] + 1
         if args.epochs < start_epoch:
             print('%s has been trained for %g epochs. Fine-tuning for %g additional epochs.' %
-                  (args.weights, ckpt['epoch'], args.epochs))
+                  (args.resume, ckpt['epoch'], args.epochs))
             args.epochs += ckpt['epoch']  # finetune additional epochs
         if args.amp and "scaler" in ckpt:
             scaler.load_state_dict(ckpt["scaler"])
