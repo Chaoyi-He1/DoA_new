@@ -38,12 +38,12 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='weights/model_175.pth', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--resume', type=str, default='weights/model_', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'),
                         help="type of positional embedding to use on top of the image features")
     parser.add_argument('--sync-bn', action='store_true', help='enabling apex sync BN.')
-    parser.add_argument('--freeze-encoder', default=True, help="freeze the encoder")
+    parser.add_argument('--freeze-encoder', default=False, help="freeze the encoder")
     parser.add_argument('--save-best', action='store_true', help="save best model")
 
     # Optimization parameters
