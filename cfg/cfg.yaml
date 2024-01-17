@@ -17,7 +17,7 @@ normalize_before: True
 
 # detection parameters
 num_classes: 3
-deg_step: 20
+deg_step: 15
 num_queries: 10
 
 # matcher parameters
@@ -28,8 +28,8 @@ set_cost_quadrant: 0.0
 set_cost_direction: 1.0
 
 set_cost_ba: 1.0
-set_cost_az: 2.0
-set_cost_el: 4.0
+set_cost_az: 0.0
+set_cost_el: 0.0
 
 # loss parameters
 ce_loss_coef: 0.0
@@ -40,7 +40,7 @@ quadrant_loss_coef: 0.0
 direction_loss_coef: 1.0  
 
 ba_loss_coef: 4.0
-az_loss_coef: 2.0
-az_mse_loss_coef: 0.05
-el_loss_coef: 2.0
-el_mse_loss_coef: 0.05
+az_loss_coef: 0.0
+az_mse_loss_coef: 0.00
+el_loss_coef: 0.0
+el_mse_loss_coef: 0.00
